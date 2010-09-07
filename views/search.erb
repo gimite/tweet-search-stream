@@ -1,0 +1,339 @@
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <% if !@query.empty? %>
+    <title><%=h @query %> - Tweet Search Stream</title>
+  <% else %>
+    <title>Tweet Search Stream</title>
+  <% end %>
+  <link href="/css/default.css" rel="stylesheet" type="text/css">
+  <!--
+  <script type='text/javascript' 
+        src='http://getfirebug.com/releases/lite/1.2/firebug-lite-compressed.js'></script>
+  -->
+  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+  <script type="text/javascript" src="http://gimite.net/js/jquery-1.3.2.min.js"></script>
+  <script type="text/javascript" src="http://gimite.net/js/jquery_create_element_tree.js"></script>
+  <script type="text/javascript" src="/js/swfobject.js"></script>
+  <script type="text/javascript" src="/js/FABridge.js"></script>
+  <script type="text/javascript" src="/js/web_socket.js"></script>
+  <script type="text/javascript">
+    
+    if (!window.console) console = {log: function(){ }, error: function(){ }};
+    
+    google.load("jquery", "1.4.2");
+    google.load("jqueryui", "1.8.4");
+    google.setOnLoadCallback(onLoad);
+    
+    WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf?" + Math.random();
+    //WEB_SOCKET_DEBUG = true;
+    FRAME_MSEC = 25;
+    
+    var query = <%= @query_json %>[0];
+    var ws;
+    var entries = [];
+    var displayQue = [];
+    var showing = false;
+    var clock = 0;
+    
+    function onLoad() {
+      if (query) {
+        openWebSocket();
+        startClockTimer();
+      }
+      showBuzz();
+      $("#close-left-button").click(onCloseLeftButtonClick);
+    }
+    
+    function onCloseLeftButtonClick() {
+      $("#left-column").css("visibility", "hidden");
+    }
+    
+    function openWebSocket() {
+      var url = "ws://gimite.net:19015/?q=" + encodeURIComponent(query);
+      console.log("openWebSocket", url);
+      ws = new WebSocket(url);
+      ws.onopen = function() {
+        console.log("ws.onopen");
+      };
+      ws.onmessage = onWebSocketMessage;
+      ws.onclose = function() {
+        console.log("ws.onclose");
+      };
+      ws.onerror = function() {
+        console.error("ws.onerror");
+      };
+    }
+    
+    function startClockTimer() {
+      setInterval(function() {
+        ++clock;
+        for (var i = 0; i < entries.length; ++i) {
+          updateDate(entries[i]);
+        }
+      }, 1000);
+    }
+    
+    function onWebSocketMessage(e) {
+      //console.log("onmessage: " + e.data);
+      var first = entries.length == 0;
+      var result = eval("(" + e.data + ")");
+      for (var i = 0; i < result.entries.length; ++i) {
+        var entry = result.entries[i];
+        entry.created_clock = clock - entry.delay_sec;
+        if (entry.retweeted_status) {
+          entry.retweeted_status.created_clock = clock - entry.retweeted_status.delay_sec;
+        }
+        if (first) {
+          if (!entry.retweeted_status) {
+            createView(entry);
+            entries.splice(0, 0, entry);  // inserts the entry to front
+            $("#result").prepend(entry.statusDiv);
+          }
+        } else {
+          queryShowEntry(entry);
+        }
+      }
+      $("#loading").hide();
+    }
+    
+    function queryShowEntry(entry) {
+      //console.log("queryShowEntry", entry);
+      displayQue.push(entry);
+      if (!showing) showEntryInQueue();
+    }
+    
+    function showEntryInQueue() {
+      
+      while (entries.length > 50) {
+        var removedEntry = entries.pop();
+        removedEntry.statusDiv.remove();
+      }
+      
+      if (displayQue.length == 0) {
+        showing = false;
+        return;
+      }
+      // Animation speed is calculated so that all entries in the queue is shown in 1 second from now.
+      var duration = 1000 / displayQue.length;
+      showing = true;
+      var entry = displayQue[0];
+      displayQue.splice(0, 1);
+      
+      if (entry.retweeted_status) {
+        var retweetedEntry = null;
+        for (var i = 0; i < entries.length; ++i) {
+          if (entries[i].id == entry.retweeted_status.id) {
+            retweetedEntry = entries[i];
+            break;
+          }
+        }
+        if (!retweetedEntry) {
+          retweetedEntry = entry.retweeted_status;
+        }
+        retweetedEntry.last_retweeter = entry.user.screen_name;
+        raiseEntry(retweetedEntry, duration);
+      } else {
+        prependEntry(entry, duration);
+      }
+      
+    }
+    
+    function prependEntry(targetEntry, duration) {
+      
+      if (!targetEntry.statusDiv) createView(targetEntry);
+      entries.splice(0, 0, targetEntry);  // inserts the entry to front
+      $("#result").prepend(targetEntry.statusDiv);
+      var height = targetEntry.statusDiv.height();
+      
+      var progress = 0;
+      function animate() {
+        if (progress > 1) progress = 1;
+        $("#result").css("top", -height * (1 - progress));
+        if (progress < 1) {
+          progress += FRAME_MSEC / duration;
+          setTimeout(animate, FRAME_MSEC);
+        } else {
+          setTimeout(showEntryInQueue, FRAME_MSEC);
+        }
+      }
+      animate();
+      
+    }
+    
+    function raiseEntry(targetEntry, duration) {
+      
+      if (!targetEntry.statusDiv) createView(targetEntry);
+      
+      var targetIndex = getEntryIndex(targetEntry);
+      if (targetIndex == 0) {
+        showEntryInQueue();
+        return;
+      }
+      var movedEntries = entries.slice(0, targetIndex);
+      
+      targetEntry.statusDiv.css("z-index", 1);
+      targetEntry.retweeterSpan.text("Retweeted by " + targetEntry.last_retweeter);
+      
+      entries.splice(targetIndex, 1);
+      entries.splice(0, 0, targetEntry);
+      movedEntries[0].statusDiv.before(targetEntry.statusDiv);
+      
+      var entryHeight = targetEntry.statusDiv.height();
+      var dist = 0;
+      for (var i = 0; i < movedEntries.length; ++i) {
+        dist += movedEntries[i].statusDiv.height();
+      }
+      if (dist > 800) dist = 800;  // to prevent too quick animation
+      
+      var progress = 0;
+      function animate() {
+        if (progress > 1) progress = 1;
+        targetEntry.statusDiv.css("top", dist * (1 - progress));
+        for (var i = 0; i < movedEntries.length; ++i) {
+          movedEntries[i].statusDiv.css("top", -entryHeight * (1 - progress));
+        }
+        if (progress < 1) {
+          progress += FRAME_MSEC / duration;
+          setTimeout(animate, FRAME_MSEC);
+        } else {
+          targetEntry.statusDiv.css("z-index", 0);
+          targetEntry.retweeterSpan.css("background-color", "#ffff40");
+          targetEntry.retweeterSpan.animate({backgroundColor: "white"}, 1000);
+          setTimeout(showEntryInQueue, FRAME_MSEC);
+        }
+      }
+      animate();
+      
+    }
+    
+    function createView(entry) {
+      var url = "http://twitter.com/" + entry.user.screen_name + "/status/" + entry.id;
+      var userUrl = "http://twitter.com/" + entry.user.screen_name;
+      struct =
+        ["div", {className: "status", key: "statusDiv"},
+          ["div", {className: "status-inner"},
+            ["div", {className: "thumbnail"},
+              ["a", {href: userUrl, target: "_blank"},
+                ["img", {className: "thumbnail-img", src: entry.user.profile_image_url}]]],
+            ["div", {className: "status-body"},
+              ["div", {className: "status-content"},
+                ["a", {className: "author", href: userUrl, target: "_blank"},
+                  entry.user.screen_name],
+                " ",
+                ["span", {className: "entry-content", key: "entryContentSpan"}]],
+              ["div", {className: "meta"},
+                ["div",
+                  ["a", {className: "entry-date", key: "dateAnchor", href: url, target: "_blank"},
+                    getDateStr(entry)],
+                  " from ",
+                  ["span", {key: "sourceSpan"}]],
+                ["div",
+                  ["span", {key: "retweeterSpan"}]]]],
+            ["div", {className: "status-footer"}]]];
+      createElementTree(struct, entry);
+      entry.entryContentSpan.html(entry.text_html);
+      entry.sourceSpan.html(entry.unescaped_source);
+    }
+    
+    function getEntryIndex(entry) {
+      for (var i = 0; i < entries.length; ++i) {
+        if (entries[i] == entry) return i;
+      }
+      return entries.length;
+    }
+    
+    function updateDate(entry) {
+      entry.dateAnchor.text(getDateStr(entry));
+    }
+    
+    function getDateStr(entry) {
+      var secAgo = clock - entry.created_clock;
+      if (secAgo == 1) {
+        return "1 second ago";
+      } else if (secAgo <= 5) {
+        return secAgo + " seconds ago";
+      } else if (secAgo < 10) {
+        return "less than 10 seconds ago";
+      } else if (secAgo < 20) {
+        return "less than 20 seconds ago";
+      } else if (secAgo < 30) {
+        return "less than 30 seconds ago";
+      } else if (secAgo < 60) {
+        return "less than 1 minute ago";
+      } else if (secAgo < 120) {
+        return "1 minute ago";
+      } else if (secAgo < 3600) {
+        return Math.ceil(secAgo / 60) + " minutes ago";
+      } else if (secAgo < 3600 * 2) {
+        return "1 hour ago";
+      } else {
+        return Math.ceil(secAgo / 3600) + " hours ago";
+      }
+      return secAgo == 1 ? "1 second ago" : secAgo + " seconds ago";
+    }
+    
+    function showBuzz() {
+      $.ajax({
+        url: "/buzz",
+        dataType: "json",
+        success: function(result) {
+          $("#buzz").empty();
+          for (var i = 0; i < result.length; ++i) {
+            for (var j = 0; j < result[i].words.length; ++j) {
+              var word = result[i].words[j];
+              $("#buzz").append(createElementTree(
+                ["div",
+                  ["img", {className: "buzz-icon", src: "/images/" + result[i].lang_id + ".png"}],
+                  ["a", {href: "/search?q=" + encodeURIComponent(word)}, word]]));
+              console.log("fuga");
+            }
+          }
+          console.log("hoge");
+        },
+        error: function() {
+          console.error("buzz fail");
+        }
+      });
+    }
+    
+  </script>
+</head><body>
+  
+  <h1 class="center-column">Tweet Search Stream</h1>
+  
+  <form class="center-column" action="/search" method="GET">
+    <div>
+      <input type="text" id="query-field" name="q" value="<%=h @query %>" size="30">
+      <input type="submit" value="Search">
+    </div>
+  </form>
+  
+  <% if !@query.empty? %>
+    <div class="summary center-column">Search result for <span class="query"><%=h @query %></span></div>
+  <% end %>
+  
+  <div class="container">
+    
+    <div id="left-column" class="left-column">
+      <div class="buzz-nav"><img id="close-left-button" src="/images/cross.png" title="Hide hot words"></div>
+      <div class="buzz-title">Hot words</div>
+      <div id="buzz" class="buzz">Loading...</div>
+      <div class="buzz-footer">
+        <div>Powered by <a href="http://buzztter.com/" target="_blank">buzztter</a></div>
+        <div>Icon by <a href="http://www.famfamfam.com/" target="_blank">famfamfam.com</a></div>
+      </div>
+    </div>
+    
+    <% if !@query.empty? %>
+      
+      <div class="result-container center-column">
+        <div id="result" class="result">
+          <div id="loading" class="loading">Loading...</div>
+        </div>
+      </div>
+      
+    <% end %>
+    
+  </div>
+  
+</body></html>

@@ -1,0 +1,4 @@
+# http://dev.twitter.com/apps
+
+TWITTER_API_KEY = "API key here"
+TWITTER_API_SECRET = "API secret here"

@@ -1,0 +1,130 @@
+body {
+  font-size: 95%;
+}
+
+h1 {
+  font-size: 150%;
+  color: #000080;
+}
+
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.left-column {
+  float: left;
+  width: 150px;
+  overflow: hidden;
+}
+
+.center-column {
+  margin-left: 170px;
+  /* I'm not sure what's happening but this actuall works as about margin-right: 100px. */
+  margin-right: -50px;
+}
+
+.center-column-left-closed {
+  margin-right: -100px;
+}
+
+.buzz-nav {
+  float: right;
+}
+
+.buzz-title {
+  font-weight: bold;
+  font-size: 80%;
+  margin-bottom: 8px;
+}
+
+.buzz {
+  font-size: 70%;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.buzz-icon {
+  margin-right: 4px;
+}
+
+.buzz-footer {
+  font-size: 70%;
+  margin-top: 8px;
+}
+
+.summary {
+}
+
+.query {
+  font-weight: bold;
+}
+
+.result-container {
+  border-top: 1px solid silver;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.result {
+  position: relative;
+}
+
+.loading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.status {
+  position: relative;
+  background-color: white;
+}
+
+.status-inner {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid silver;
+}
+
+.thumbnail {
+  float: left;
+}
+
+.thumbnail-img {
+  width: 48px;
+  height: 48px;
+}
+
+.status-body {
+  margin-left: 54px;
+}
+
+.author {
+  font-weight: bold;
+  font-color: blue;
+}
+
+.meta {
+  font-size: 70%;
+  color: gray;
+}
+
+.meta a {
+  color: gray;
+}
+
+.entry-date {
+  color: gray;
+  text-decoration: none;
+}
+
+.entry-date:hover {
+  text-decoration: underline;
+}
+
+.status-footer {
+  clear: left;
+}
