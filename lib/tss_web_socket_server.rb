@@ -11,6 +11,8 @@ require "time"
 require "enumerator"
 require "rss"
 require "open-uri"
+require "logger"
+require "uri"
 
 require "rubygems"
 require "json"
@@ -20,20 +22,22 @@ require "twitter"
 require "web_socket"
 require "tss_config"
 require "session"
+require "tss_web_server"
 
 
 class TSSWebSocketServer
     
-    def initialize(test_only = false)
+    def initialize(logger = nil, test_only = false)
+      @logger = logger || Logger.new(STDERR)
       if !test_only
-        @server = WebSocketServer.new(:accepted_domains => "gimite.net", :port => 19015, :enable_draft75 => true)
+        @server = WebSocketServer.new(:accepted_domains => URI.parse(BASE_URL).host, :port => 13000)
       end
     end
     
     def run()
       @server.run() do |ws|
-        puts("Connection accepted")
-        puts("Path: #{ws.path}, Origin: #{ws.origin}")
+        @logger.info("Connection accepted: #{ws.object_id}")
+        @logger.info("Path: #{ws.path}, Origin: #{ws.origin}")
         uri = URI.parse(ws.path)
         params = CGI.parse(uri.query)
         if uri.path == "/" && !params["q"].empty?
@@ -43,7 +47,7 @@ class TSSWebSocketServer
             (k, v) = field.split(/=/, 2)
             cookie[k] = CGI.unescape(v)
           end
-          session_id = cookie["real_time_tweets_session"]
+          session_id = cookie[TSSWebServer::COOKIE_KEY]
           raise("session_id missing") if !session_id
           session = Session.get(session_id)
           auth_params = {
@@ -52,22 +56,31 @@ class TSSWebSocketServer
           }
           query = params["q"][0]
           thread = Thread.new() do
-            entries = search(query, auth_params)["results"].reverse()
-            convert_entries(entries, :search)
-            send(ws, entries)
-            get_search_stream(query, auth_params) do |entry|
-              entries = [entry]
-              convert_entries(entries, :stream)
+            begin
+              entries = search(query, auth_params)["results"].reverse()
+              convert_entries(entries, :search)
               send(ws, entries)
+              get_search_stream(query, auth_params) do |entry|
+                entries = [entry]
+                convert_entries(entries, :stream)
+                send(ws, entries)
+              end
+            rescue => ex
+              print_backtrace(ex)
             end
+            @logger.info("Streaming API connection closed: #{ws.object_id}")
+            ws.close_socket() rescue nil
           end
-          while ws.receive()
+          begin
+            while ws.receive()
+            end
+          rescue => ex
           end
           thread.kill()
         else
           ws.handshake("404 Not Found")
         end
-        puts("Connection closed")
+        @logger.info("Connection closed: #{ws.object_id}")
       end
     end
     
@@ -146,9 +159,9 @@ class TSSWebSocketServer
     def send(ws, entries)
       for entry in entries
         if entry["retweeted_status"]
-          puts("rt: " + entry["retweeted_status"]["unescaped_text"])
+          #puts("rt: " + entry["retweeted_status"]["unescaped_text"])
         else
-          puts(entry["user"]["screen_name"] + ": " + entry["unescaped_text"])
+          #puts(entry["user"]["screen_name"] + ": " + entry["unescaped_text"])
         end
         #pp entry
       end
@@ -191,4 +204,11 @@ class TSSWebSocketServer
       return result
     end
     
+    def print_backtrace(ex)
+      @logger.error("%s: %s (%p)" % [ex.backtrace[0], ex.message, ex.class])
+      for s in ex.backtrace[1..-1]
+        @logger.error("        %s" % s)
+      end
+    end
+
 end

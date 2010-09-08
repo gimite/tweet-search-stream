@@ -10,17 +10,29 @@ class Session
     
     STORE_PATH = "data/session.marshal"
     
-    if File.exist?(STORE_PATH)
-      @sessions = open(STORE_PATH, "rb"){ |f| Marshal.load(f) }
-    else
-      @sessions = {}
+    def self.get(id)
+      session = @sessions[id]
+      session.touch() if session
+      return session
     end
     
-    def self.get(id)
-      return @sessions[id]
+    def self.start_auto_save()
+      Thread.new() do
+        while true
+          sleep(30)
+          save()
+        end
+      end
+      at_exit(){ save() }
     end
     
     def self.save()
+      for id, session in @sessions
+        if session.last_access_at < Time.now - 3 * 30 * 24 * 3600
+          puts("Session #{id} is expired")
+          @sessions.delete(id)
+        end
+      end
       open(STORE_PATH, "wb"){ |f| Marshal.dump(@sessions, f) }
     end
     
@@ -31,21 +43,32 @@ class Session
     def initialize()
       @id = SecureRandom.base64()
       @data = {}
+      @last_access_at = Time.now
       Session.sessions[@id] = self
     end
     
-    attr_reader(:id)
+    attr_reader(:id, :last_access_at)
     
     def [](key)
       return @data[key]
     end
     
-    def []=(key, value)
-      @data[key] = value
+    def data=(data)
+      @data = data
     end
     
     def clear()
-      @data.clear()
+      @data = {}
+    end
+    
+    def touch()
+      @last_access_at = Time.now
+    end
+    
+    if File.exist?(STORE_PATH)
+      @sessions = open(STORE_PATH, "rb"){ |f| Marshal.load(f) }
+    else
+      @sessions = {}
     end
     
 end

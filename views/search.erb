@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <% if !@query.empty? %>
@@ -24,11 +25,12 @@
     google.load("jqueryui", "1.8.4");
     google.setOnLoadCallback(onLoad);
     
-    WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf?" + Math.random();
+    WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf";
     //WEB_SOCKET_DEBUG = true;
-    FRAME_MSEC = 25;
+    FRAME_MSEC = 40;
     
     var query = <%= @query_json %>[0];
+    var host = "<%= @host %>";
     var ws;
     var entries = [];
     var displayQue = [];
@@ -42,26 +44,28 @@
       }
       showBuzz();
       $("#close-left-button").click(onCloseLeftButtonClick);
+      $("#retry-link").click(onRetryLinkClick);
     }
     
     function onCloseLeftButtonClick() {
       $("#left-column").css("visibility", "hidden");
     }
     
+    function onRetryLinkClick(e) {
+      e.preventDefault();
+      location.reload();
+    }
+    
     function openWebSocket() {
-      var url = "ws://gimite.net:19015/?q=" + encodeURIComponent(query);
+      var url = "ws://" + host + ":13000/?q=" + encodeURIComponent(query);
       console.log("openWebSocket", url);
       ws = new WebSocket(url);
       ws.onopen = function() {
         console.log("ws.onopen");
       };
       ws.onmessage = onWebSocketMessage;
-      ws.onclose = function() {
-        console.log("ws.onclose");
-      };
-      ws.onerror = function() {
-        console.error("ws.onerror");
-      };
+      ws.onclose = onWebSocketClosed;
+      ws.onerror = onWebSocketClosed;
     }
     
     function startClockTimer() {
@@ -94,6 +98,11 @@
         }
       }
       $("#loading").hide();
+    }
+    
+    function onWebSocketClosed() {
+      console.error("onWebSocketClosed");
+      $("#disconnected-message").show();
     }
     
     function queryShowEntry(entry) {
@@ -285,10 +294,8 @@
                 ["div",
                   ["img", {className: "buzz-icon", src: "/images/" + result[i].lang_id + ".png"}],
                   ["a", {href: "/search?q=" + encodeURIComponent(word)}, word]]));
-              console.log("fuga");
             }
           }
-          console.log("hoge");
         },
         error: function() {
           console.error("buzz fail");
@@ -298,6 +305,8 @@
     
   </script>
 </head><body>
+  
+  <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
   
   <h1 class="center-column">Tweet Search Stream</h1>
   
@@ -326,7 +335,18 @@
     
     <% if !@query.empty? %>
       
-      <div class="result-container center-column">
+      <div id="disconnected-message" class="error center-column" style="display: none;">
+        Disconnected. <a href="#" id="retry-link">Retry</a>
+      </div>
+      
+      <% if @unsupported_query %>
+        <div class="error center-column">
+          Auto-reloading doesn't work for most of Japanese/Chinese keywords
+          due to Twitter API limitation.
+        </div>
+      <% end %>
+        
+      <div class="result-container">
         <div id="result" class="result">
           <div id="loading" class="loading">Loading...</div>
         </div>

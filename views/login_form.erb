@@ -1,18 +1,22 @@
+<!DOCTYPE html>
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <link href="/css/default.css" rel="stylesheet" type="text/css">
   <title>Twitter Real Time Search Results</title>
 </head><body>
   
-  <h1>Twitter Real Time Search Results</h1>
+  <h1 class="single-column">Twitter Real Time Search Results</h1>
   
-  <div class="container">
-    <div>Sign in with Twitter to use this service.</div>
-    <div>
-      <a href="<%=h @login_url %>">
-        <img src="/images/sign-in-with-twitter-d.png">
-      </a>
-    </div>
+  <div class="single-column">
+    <p>
+      This is real time Twitter search using Twitter Streaming API.
+      New tweets are automatically shown in a few seconds after posting.
+    </p>
+    <p>Sign in with Twitter to use this service.</p>
+    <form action="/login" method="POST">
+      <input type="hidden" name="redirect" value="<%=h @current_url %>">
+      <input type="image" src="/images/sign-in-with-twitter-d.png">
+    </form>
   </div>
   
 </body></html>

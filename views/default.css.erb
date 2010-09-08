@@ -15,6 +15,11 @@ a:hover {
   text-decoration: underline;
 }
 
+.header {
+  float: right;
+  font-size: 80%;
+}
+
 .left-column {
   float: left;
   width: 150px;
@@ -23,12 +28,7 @@ a:hover {
 
 .center-column {
   margin-left: 170px;
-  /* I'm not sure what's happening but this actuall works as about margin-right: 100px. */
-  margin-right: -50px;
-}
-
-.center-column-left-closed {
-  margin-right: -100px;
+  margin-right: 100px;
 }
 
 .buzz-nav {
@@ -64,8 +64,16 @@ a:hover {
 }
 
 .result-container {
-  border-top: 1px solid silver;
+  margin-left: 170px;
+  <% if @webkit %>
+    /* I'm not sure what's happening but this makes actual margin 100px in Chrome, probably
+       because of existence of left-column. */
+    margin-right: -50px;
+  <% else %>
+    margin-right: 100px;
+  <% end %>
   margin-top: 8px;
+  border-top: 1px solid silver;
   overflow: hidden;
 }
 
@@ -96,6 +104,7 @@ a:hover {
 .thumbnail-img {
   width: 48px;
   height: 48px;
+  border: 0px;
 }
 
 .status-body {
@@ -118,13 +127,25 @@ a:hover {
 
 .entry-date {
   color: gray;
-  text-decoration: none;
-}
-
-.entry-date:hover {
-  text-decoration: underline;
 }
 
 .status-footer {
   clear: left;
+}
+
+.error {
+  color: red;
+  border: 1px solid red;
+  padding: 8px;
+  background-color: #ffe0e0;
+  text-align: center;
+}
+
+.single-column {
+  margin-left: 100px;
+  margin-right: 100px;
+}
+
+.login-button {
+  border: 0px;
 }

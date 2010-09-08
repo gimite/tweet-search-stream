@@ -2,3 +2,6 @@
 
 TWITTER_API_KEY = "API key here"
 TWITTER_API_SECRET = "API secret here"
+
+BASE_URL = "http://tweet-search-stream.gimite.net"
+SINATRA_ENVIRONMENT = :production
