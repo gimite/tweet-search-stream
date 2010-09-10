@@ -133,6 +133,8 @@ class TSSWebServer < Sinatra::Base
         @host = URI.parse(BASE_URL).host
         @screen_name = @session[:screen_name]
         @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
+        @title = params[:title]
+        @logo_url = params[:logo]
         erb(:search)
       else
         @current_url = request.path + (request.query_string.empty? ? "" : "?" + request.query_string)

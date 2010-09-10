@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <% if !@query.empty? %>
+  <% if @title %>
+    <title><%=h @title %></title>
+  <% elsif !@query.empty? %>
     <title><%=h @query %> - Tweet Search Stream</title>
   <% else %>
     <title>Tweet Search Stream</title>
@@ -308,9 +310,18 @@
   
   <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
   
-  <h1 class="center-column">Tweet Search Stream</h1>
+  <h1 class="center-column">
+    <% if @logo_url %>
+      <img class="logo" src="<%=h @logo_url %>">
+    <% end %>
+    <% if @title %>
+      <%=h @title %>
+    <% else %>
+      Tweet Search Stream
+    <% end %>
+  </h1>
   
-  <form class="center-column" action="/search" method="GET">
+  <form class="query-form center-column" action="/search" method="GET">
     <div>
       <input type="text" id="query-field" name="q" value="<%=h @query %>" size="30">
       <input type="submit" value="Search">
