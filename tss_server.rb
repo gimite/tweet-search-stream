@@ -25,6 +25,5 @@ Daemons.run_proc("tss_server", :log_output => true, :dir_mode => :normal, :dir =
   Session.start_auto_save()
   server = TSSWebSocketServer.new()
   Thread.new(){ server.run() }
-  puts("WebSocket Server is running")
-  TSSWebServer.run!(:port => 12011)
+  TSSWebServer.run!()
 end
