@@ -26,6 +26,7 @@ class TSSWebServer < Sinatra::Base
     
     COOKIE_KEY = "session"
     
+    set(:port, WEB_SERVER_PORT)
     set(:environment, SINATRA_ENVIRONMENT)
     set(:public, "./public")
     set(:logging, true)
@@ -131,9 +132,11 @@ class TSSWebServer < Sinatra::Base
       if @twitter
         @query = query
         @query_json = JSON.dump([@query])
-        @host = URI.parse(BASE_URL).host
+        @web_socket_url = "ws://%s:%d/" % [URI.parse(BASE_URL).host, WEB_SOCKET_SERVER_PORT]
         @screen_name = @session[:screen_name]
         @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
+        @title = params[:title]
+        @logo_url = params[:logo]
         erb(:search)
       else
         @current_url = request.path + (request.query_string.empty? ? "" : "?" + request.query_string)

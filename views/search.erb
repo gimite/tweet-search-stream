@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <% if !@query.empty? %>
+  <% if @title %>
+    <title><%=h @title %></title>
+  <% elsif !@query.empty? %>
     <title><%=h @query %> - Tweet Search Stream</title>
   <% else %>
     <title>Tweet Search Stream</title>
@@ -12,7 +14,6 @@
         src='http://getfirebug.com/releases/lite/1.2/firebug-lite-compressed.js'></script>
   -->
   <script type="text/javascript" src="http://www.google.com/jsapi"></script>
-  <script type="text/javascript" src="http://gimite.net/js/jquery-1.3.2.min.js"></script>
   <script type="text/javascript" src="http://gimite.net/js/jquery_create_element_tree.js"></script>
   <script type="text/javascript" src="/js/swfobject.js"></script>
   <script type="text/javascript" src="/js/FABridge.js"></script>
@@ -30,12 +31,13 @@
     FRAME_MSEC = 40;
     
     var query = <%= @query_json %>[0];
-    var host = "<%= @host %>";
+    var web_socket_url = "<%= @web_socket_url %>";
     var ws;
     var entries = [];
     var displayQue = [];
     var showing = false;
     var clock = 0;
+    var errorShown = false;
     
     function onLoad() {
       if (query) {
@@ -57,7 +59,7 @@
     }
     
     function openWebSocket() {
-      var url = "ws://" + host + ":13000/?q=" + encodeURIComponent(query);
+      var url = web_socket_url + "?q=" + encodeURIComponent(query);
       console.log("openWebSocket", url);
       ws = new WebSocket(url);
       ws.onopen = function() {
@@ -81,28 +83,37 @@
       //console.log("onmessage: " + e.data);
       var first = entries.length == 0;
       var result = eval("(" + e.data + ")");
-      for (var i = 0; i < result.entries.length; ++i) {
-        var entry = result.entries[i];
-        entry.created_clock = clock - entry.delay_sec;
-        if (entry.retweeted_status) {
-          entry.retweeted_status.created_clock = clock - entry.retweeted_status.delay_sec;
-        }
-        if (first) {
-          if (!entry.retweeted_status) {
-            createView(entry);
-            entries.splice(0, 0, entry);  // inserts the entry to front
-            $("#result").prepend(entry.statusDiv);
+      if (result.entries) {
+        for (var i = 0; i < result.entries.length; ++i) {
+          var entry = result.entries[i];
+          entry.created_clock = clock - entry.delay_sec;
+          if (entry.retweeted_status) {
+            entry.retweeted_status.created_clock = clock - entry.retweeted_status.delay_sec;
           }
-        } else {
-          queryShowEntry(entry);
+          if (first) {
+            if (!entry.retweeted_status) {
+              createView(entry);
+              entries.splice(0, 0, entry);  // inserts the entry to front
+              $("#result").prepend(entry.statusDiv);
+            }
+          } else {
+            queryShowEntry(entry);
+          }
         }
+        if (result.entries.length > 0) {
+          $("#result-message").hide();
+        } else if (first) {
+          $("#result-message").text("No tweets found.");
+        }
+      } else {
+        showError("Error: " + result.error);
       }
-      $("#loading").hide();
     }
     
     function onWebSocketClosed() {
-      console.error("onWebSocketClosed");
-      $("#disconnected-message").show();
+      console.log("ws.onclose or ws.onerror");
+      if (!errorShown) showError("Disconnected.", true);
+      $("#result-message").hide();
     }
     
     function queryShowEntry(entry) {
@@ -303,14 +314,35 @@
       });
     }
     
+    function showError(message, show_retry_link) {
+      console.error(message);
+      $("#error-message").text(message);
+      if (show_retry_link) {
+        $("#retry-link").show();
+      } else {
+        $("#retry-link").hide();
+      }
+      $("#error-bar").show();
+      errorShown = true;
+    }
+    
   </script>
 </head><body>
   
   <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
   
-  <h1 class="center-column">Tweet Search Stream</h1>
+  <h1 class="center-column">
+    <% if @logo_url %>
+      <img class="logo" src="<%=h @logo_url %>">
+    <% end %>
+    <% if @title %>
+      <%=h @title %>
+    <% else %>
+      Tweet Search Stream
+    <% end %>
+  </h1>
   
-  <form class="center-column" action="/search" method="GET">
+  <form class="query-form center-column" action="/search" method="GET">
     <div>
       <input type="text" id="query-field" name="q" value="<%=h @query %>" size="30">
       <input type="submit" value="Search">
@@ -335,8 +367,9 @@
     
     <% if !@query.empty? %>
       
-      <div id="disconnected-message" class="error center-column" style="display: none;">
-        Disconnected. <a href="#" id="retry-link">Retry</a>
+      <div id="error-bar" class="error center-column" style="display: none;">
+        <span id="error-message"></span>
+        <a href="#" id="retry-link">Retry</a>
       </div>
       
       <% if @unsupported_query %>
@@ -348,7 +381,7 @@
         
       <div class="result-container">
         <div id="result" class="result">
-          <div id="loading" class="loading">Loading...</div>
+          <div id="result-message" class="result-message">Loading...</div>
         </div>
       </div>
       

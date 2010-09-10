@@ -30,7 +30,12 @@ class TSSWebSocketServer
     def initialize(logger = nil, test_only = false)
       @logger = logger || Logger.new(STDERR)
       if !test_only
-        @server = WebSocketServer.new(:accepted_domains => URI.parse(BASE_URL).host, :port => 13000)
+        params = {
+          :accepted_domains => URI.parse(BASE_URL).host,
+          :port => WEB_SOCKET_SERVER_PORT,
+        }
+        @server = WebSocketServer.new(params)
+        @logger.info("WebSocket Server is running: %p" % params)
       end
     end
     
@@ -57,13 +62,18 @@ class TSSWebSocketServer
           query = params["q"][0]
           thread = Thread.new() do
             begin
-              entries = search(query, auth_params)["results"].reverse()
-              convert_entries(entries, :search)
-              send(ws, entries)
-              get_search_stream(query, auth_params) do |entry|
-                entries = [entry]
-                convert_entries(entries, :stream)
-                send(ws, entries)
+              res = search(query, auth_params)
+              if res["results"]
+                entries = res["results"].reverse()
+                convert_entries(entries, :search)
+                send(ws, {"entries" => entries})
+                get_search_stream(query, auth_params) do |entry|
+                  entries = [entry]
+                  convert_entries(entries, :stream)
+                  send(ws, {"entries" => entries})
+                end
+              else
+                send(ws, {"error" => res["error"]})
               end
             rescue => ex
               print_backtrace(ex)
@@ -87,25 +97,24 @@ class TSSWebSocketServer
     def get_search_stream(query, auth_params, &block)
       buffer = ""
       url = URI.parse("http://stream.twitter.com/1/statuses/filter.json")
-      Net::HTTP.new(url.host, url.port).start do |http|
+      Net::HTTP.new(url.host, url.port).start() do |http|
         req = Net::HTTP::Post.new(url.path)
         req.form_data = {'track' => query}
         authenticate(req, http, auth_params)
         http.request(req) do |res|
-          case res
-            when Net::HTTPSuccess
-              res.read_body() do |s|
-                buffer << s
-                while buffer.gsub!(/\A(.*)\r\n/, "")
-                  json = $1
-                  if !json.empty?
-                    entry = JSON.parse(json)
-                    yield(entry)
-                  end
+          if res.is_a?(Net::HTTPSuccess)
+            res.read_body() do |s|
+              buffer << s
+              while buffer.gsub!(/\A(.*)\r\n/, "")
+                json = $1
+                if !json.empty?
+                  entry = JSON.parse(json)
+                  yield(entry)
                 end
               end
-            else
-              raise(res.to_s())
+            end
+          else
+            raise(res.to_s())
           end
         end
       end
@@ -156,19 +165,21 @@ class TSSWebSocketServer
       end
     end
     
-    def send(ws, entries)
-      for entry in entries
-        if entry["retweeted_status"]
-          #puts("rt: " + entry["retweeted_status"]["unescaped_text"])
-        else
-          #puts(entry["user"]["screen_name"] + ": " + entry["unescaped_text"])
-        end
-        #pp entry
-      end
+    def send(ws, data)
+      #if data["entries"]
+      #  for entry in data["entries"]
+      #    if entry["retweeted_status"]
+      #      puts("rt: " + entry["retweeted_status"]["unescaped_text"])
+      #    else
+      #      puts(entry["user"]["screen_name"] + ": " + entry["unescaped_text"])
+      #    end
+      #    pp entry
+      #  end
+      #end
       begin
-        ws.send(JSON.dump({"entries" => entries}))
+        ws.send(JSON.dump(data))
       rescue => ex
-        p ex
+        print_backtrace(ex)
       end
     end
     
