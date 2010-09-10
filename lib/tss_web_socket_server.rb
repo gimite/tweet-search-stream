@@ -145,11 +145,11 @@ class TSSWebSocketServer
             "profile_image_url" => entry["profile_image_url"],
           }
         end
-        unescaped_text = CGI.unescapeHTML(entry["text"])
+        unescaped_text = CGI.unescapeHTML(entry["text"] || "")
         entry["unescaped_text"] = unescaped_text
         entry["text_html"] = auto_link(unescaped_text)
-        entry["unescaped_source"] = CGI.unescapeHTML(entry["source"])
-        entry["delay_sec"] = (Time.now - Time.parse(entry["created_at"])).to_i()
+        entry["unescaped_source"] = CGI.unescapeHTML(entry["source"] || "")
+        entry["delay_sec"] = (Time.now - Time.parse(entry["created_at"] || "")).to_i()
         if entry["retweeted_status"]
           convert_entries([entry["retweeted_status"]], type)
         end
