@@ -44,7 +44,8 @@ class TSSWebServer < Sinatra::Base
     end
     
     get("/") do
-      query = params[:q] || get_buzz_words("en")[0] || ""
+      buzz_words = get_buzz_words("en")
+      query = params[:q] || buzz_words.grep(/^\#/)[0] || buzz_words[0] || ""
       search(query)
     end
 
