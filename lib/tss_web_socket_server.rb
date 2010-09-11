@@ -120,6 +120,31 @@ class TSSWebSocketServer
       end
     end
     
+    def get_sample_stream(auth_params, &block)
+      buffer = ""
+      url = URI.parse("http://stream.twitter.com/1/statuses/sample.json")
+      Net::HTTP.new(url.host, url.port).start() do |http|
+        req = Net::HTTP::Get.new(url.path)
+        authenticate(req, http, auth_params)
+        http.request(req) do |res|
+          if res.is_a?(Net::HTTPSuccess)
+            res.read_body() do |s|
+              buffer << s
+              while buffer.gsub!(/\A(.*)\r\n/, "")
+                json = $1
+                if !json.empty?
+                  entry = JSON.parse(json)
+                  yield(entry)
+                end
+              end
+            end
+          else
+            raise(res.to_s())
+          end
+        end
+      end
+    end
+    
     def search(query, auth_params)
       # Authentication is optional for this method, but I do it here to let per-user
       # limit (instead of per-IP limit) applied to it.

@@ -4,6 +4,7 @@
 $KCODE = "u"
 
 require "securerandom"
+require "fileutils"
 
 
 class Session
@@ -33,7 +34,11 @@ class Session
           @sessions.delete(id)
         end
       end
-      open(STORE_PATH, "wb"){ |f| Marshal.dump(@sessions, f) }
+      # Create a path which is unique at this moment.
+      tmp = Object.new()
+      tmp_path = "%s.%d.%d" % [STORE_PATH, Process.pid, tmp.object_id]
+      open(tmp_path, "wb"){ |f| Marshal.dump(@sessions, f) }
+      FileUtils.mv(tmp_path, STORE_PATH)
     end
     
     def self.sessions
