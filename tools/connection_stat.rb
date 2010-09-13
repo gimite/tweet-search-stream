@@ -1,3 +1,9 @@
+#!/usr/bin/env ruby
+# coding: utf-8
+
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
+
 conns = 0
 File.foreach("log/tss_server.output") do |line|
   if line =~ /Connection accepted: (-?\d+)/

@@ -1,5 +1,7 @@
-#!/usr/bin/env ruby
 # coding: utf-8
+
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
 
 $KCODE = "u"
 
@@ -26,8 +28,8 @@ class TSSWebServer < Sinatra::Base
     
     COOKIE_KEY = "session"
     
-    set(:port, WEB_SERVER_PORT)
-    set(:environment, SINATRA_ENVIRONMENT)
+    set(:port, TSSConfig::WEB_SERVER_PORT)
+    set(:environment, TSSConfig::SINATRA_ENVIRONMENT)
     set(:public, "./public")
     set(:logging, true)
     
@@ -56,7 +58,7 @@ class TSSWebServer < Sinatra::Base
     end
     
     post("/login") do
-      callback_url = "#{BASE_URL}/oauth_callback?redirect=" + CGI.escape(params[:redirect] || "")
+      callback_url = "#{TSSConfig::BASE_URL}/oauth_callback?redirect=" + CGI.escape(params[:redirect] || "")
       request_token = self.oauth_consumer.get_request_token(:oauth_callback => callback_url)
       @session.data = {
         :request_token => request_token.token,
@@ -116,7 +118,7 @@ class TSSWebServer < Sinatra::Base
 
     def get_twitter(access_token, access_token_secret)
       if access_token
-        twitter_oauth = Twitter::OAuth.new(TWITTER_API_KEY, TWITTER_API_SECRET)
+        twitter_oauth = Twitter::OAuth.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET)
         twitter_oauth.authorize_from_access(access_token, access_token_secret)
         return Twitter::Base.new(twitter_oauth)
       else
@@ -125,14 +127,14 @@ class TSSWebServer < Sinatra::Base
     end
 
     def oauth_consumer
-      return OAuth::Consumer.new(TWITTER_API_KEY, TWITTER_API_SECRET, :site => "http://twitter.com")
+      return OAuth::Consumer.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET, :site => "http://twitter.com")
     end
 
     def search(query)
       if @twitter
         @query = query
         @query_json = JSON.dump([@query])
-        @web_socket_url = "ws://%s:%d/" % [URI.parse(BASE_URL).host, WEB_SOCKET_SERVER_PORT]
+        @web_socket_url = "ws://%s:%d/" % [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
         @screen_name = @session[:screen_name]
         @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
         @title = params[:title]

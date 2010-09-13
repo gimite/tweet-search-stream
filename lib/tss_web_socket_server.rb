@@ -1,5 +1,7 @@
-#!/usr/bin/env ruby
 # coding: utf-8
+
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
 
 $KCODE = "u"
 
@@ -31,8 +33,8 @@ class TSSWebSocketServer
       @logger = logger || Logger.new(STDERR)
       if !test_only
         params = {
-          :accepted_domains => URI.parse(BASE_URL).host,
-          :port => WEB_SOCKET_SERVER_PORT,
+          :accepted_domains => URI.parse(TSSConfig::BASE_URL).host,
+          :port => TSSConfig::WEB_SOCKET_SERVER_PORT,
         }
         @server = WebSocketServer.new(params)
         @logger.info("WebSocket Server is running: %p" % params)
@@ -160,7 +162,7 @@ class TSSWebSocketServer
     
     def authenticate(req, http, auth_params)
       if auth_params[:oauth_access_token] && auth_params[:oauth_access_token_secret]
-        twitter_oauth = Twitter::OAuth.new(TWITTER_API_KEY, TWITTER_API_SECRET)
+        twitter_oauth = Twitter::OAuth.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET)
         twitter_oauth.authorize_from_access(
             auth_params[:oauth_access_token], auth_params[:oauth_access_token_secret])
         req.oauth!(http, twitter_oauth.signing_consumer, twitter_oauth.access_token)

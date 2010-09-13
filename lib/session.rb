@@ -1,5 +1,7 @@
-#!/usr/bin/env ruby
 # coding: utf-8
+
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
 
 $KCODE = "u"
 

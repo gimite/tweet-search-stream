@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 # coding: utf-8
 
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
+
 $KCODE = "u"
 $LOAD_PATH << "."
 $LOAD_PATH << "./lib"
@@ -10,7 +13,6 @@ require "logger"
 require "fileutils"
 
 require "rubygems"
-require "highline"
 require "daemons"
 
 require "tss_web_server"
