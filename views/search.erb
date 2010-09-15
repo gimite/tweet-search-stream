@@ -339,11 +339,13 @@
     <% if @logo_url %>
       <img class="logo" src="<%=h @logo_url %>">
     <% end %>
-    <% if @title %>
-      <%=h @title %>
-    <% else %>
-      Tweet Search Stream
-    <% end %>
+    <a class="title" href="/">
+      <% if @title %>
+        <%=h @title %>
+      <% else %>
+        Tweet Search Stream
+      <% end %>
+    </a>
   </h1>
   
   <form class="query-form center-column" action="/search" method="GET">
