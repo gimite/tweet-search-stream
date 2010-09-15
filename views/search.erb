@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <% if @title %>
     <title><%=h @title %></title>
-  <% elsif !@query.empty? %>
+  <% elsif !@query.empty? && !@index %>
     <title><%=h @query %> - Tweet Search Stream</title>
   <% else %>
     <title>Tweet Search Stream</title>

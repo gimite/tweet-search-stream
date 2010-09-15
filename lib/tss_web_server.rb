@@ -48,13 +48,13 @@ class TSSWebServer < Sinatra::Base
     
     get("/") do
       buzz_words = get_buzz_words("en")
-      query = params[:q] || buzz_words.grep(/^\#/)[0] || buzz_words[0] || ""
-      search(query)
+      query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
+      search(query, true)
     end
 
     get("/search") do
       query = params[:q] || ""
-      search(query)
+      search(query, false)
     end
     
     post("/login") do
@@ -130,10 +130,11 @@ class TSSWebServer < Sinatra::Base
       return OAuth::Consumer.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET, :site => "http://twitter.com")
     end
 
-    def search(query)
+    def search(query, index)
       if @twitter
         @query = query
         @query_json = JSON.dump([@query])
+        @index = index
         @web_socket_url = "ws://%s:%d/" % [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
         @screen_name = @session[:screen_name]
         @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
