@@ -90,10 +90,7 @@
       if (result.entries) {
         for (var i = 0; i < result.entries.length; ++i) {
           var entry = result.entries[i];
-          entry.created_clock = clock - entry.delay_sec;
-          if (entry.retweeted_status) {
-            entry.retweeted_status.created_clock = clock - entry.retweeted_status.delay_sec;
-          }
+          convertEntry(entry);
           if (first) {
             if (!entry.retweeted_status) {
               createView(entry);
@@ -111,6 +108,19 @@
         }
       } else {
         showError("Error: " + result.error);
+      }
+    }
+    
+    function convertEntry(entry) {
+      entry.unescaped_text = unescapeHtml(entry.text || "");
+      entry.unescaped_source = unescapeHtml(entry.source || "");
+      // IE doesn't accept +0000 format.
+      var createdAt = new Date(entry.created_at.replace(/\+0000/, "UTC"));
+      var now = new Date(entry.now * 1000);
+      entry.created_clock = clock - Math.floor((now - createdAt) / 1000);
+      if (entry.retweeted_status) {
+        entry.retweeted_status.now = entry.now;
+        convertEntry(entry.retweeted_status);
       }
     }
     
@@ -255,7 +265,7 @@
                   ["span", {key: "retweeterSpan"}]]]],
             ["div", {className: "status-footer"}]]];
       createElementTree(struct, entry);
-      entry.entryContentSpan.html(entry.text_html);
+      autoLink(entry.unescaped_text, entry.entryContentSpan);
       entry.sourceSpan.html(entry.unescaped_source);
     }
     
@@ -268,6 +278,52 @@
     
     function updateDate(entry) {
       entry.dateAnchor.text(getDateStr(entry));
+    }
+    
+    // Streaming API output has "urls" information but it looks Search API output doesn't.
+    // So I use my hand-made pattern matching.
+    function autoLink(str, elem) {
+      var exp =
+          /(^|\s|[^\u0020-\u007f])((\#[a-zA-Z\d_]+)|(@[a-zA-Z\d_]+)|(https?:\/\/[\u0021-\u007f]+))/g;
+      var lastIndex = 0;
+      var m;
+      while (m = exp.exec(str)) {
+        var text = str.substr(lastIndex, m.index - lastIndex);
+        //console.log(text);
+        appendText(elem, text);
+        var prefix = m[1];
+        var url;
+        var target;
+        if (m[3]) {
+          text = m[3];
+          url = "/search?q=" + encodeURIComponent(text);
+          target = "_self";
+        } else if (m[4]) {
+          text = m[4];
+          url = "http://twitter.com/" + text.replace(/^@/, "");
+          target = "_blank";
+        } else if (m[5]) {
+          text = m[5];
+          url = text;
+          target = "_blank";
+        }
+        //console.log(prefix, text, url, target);
+        appendText(elem, prefix);
+        elem.append(createElementTree(["a", {href: url, target: target}, text]));
+        lastIndex = m.index + m[0].length;
+      }
+      var text = str.substr(lastIndex);
+      //console.log(text);
+      appendText(elem, text);
+    }
+    
+    function appendText(elem, str) {
+      elem.append(document.createTextNode(str));
+    }
+    
+    function unescapeHtml(str) {
+      return str.replace(/&lt;/g, "<").replace(/&gt;/g, ">").
+          replace(/&quot;/g, '"').replace(/&amp;/, "&");
     }
     
     function getDateStr(entry) {

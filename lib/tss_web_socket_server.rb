@@ -67,12 +67,14 @@ class TSSWebSocketServer
               res = search(query, auth_params)
               if res["results"]
                 entries = res["results"].reverse()
-                convert_entries(entries, :search)
+                convert_entries(entries)
                 send(ws, {"entries" => entries})
-                get_search_stream(query, auth_params) do |entry|
-                  entries = [entry]
-                  convert_entries(entries, :stream)
-                  send(ws, {"entries" => entries})
+                # For Streaming API, directly modifies JSON instead of parsing JSON and converting
+                # back to JSON for efficiency.
+                get_search_stream(query, auth_params) do |json|
+                  json.slice!(json.length - 1, 1)  # Deletes last '}'
+                  s = '{"entries": [%s,"now":%f}]}' % [json, Time.now.to_f()]
+                  send_raw(ws, s)
                 end
               else
                 send(ws, {"error" => res["error"]})
@@ -98,6 +100,7 @@ class TSSWebSocketServer
     
     def get_search_stream(query, auth_params, &block)
       buffer = ""
+      #url = URI.parse("http://192.168.1.7:12000/")
       url = URI.parse("http://stream.twitter.com/1/statuses/filter.json")
       Net::HTTP.new(url.host, url.port).start() do |http|
         req = Net::HTTP::Post.new(url.path)
@@ -110,8 +113,7 @@ class TSSWebSocketServer
               while buffer.gsub!(/\A(.*)\r\n/, "")
                 json = $1
                 if !json.empty?
-                  entry = JSON.parse(json)
-                  yield(entry)
+                  yield(json)
                 end
               end
             end
@@ -173,21 +175,16 @@ class TSSWebSocketServer
       end
     end
 
-    def convert_entries(entries, type)
+    # Converts entry in Search API to entry in Search Streaming API.
+    def convert_entries(entries)
       for entry in entries
-        if type == :search
-          entry["user"] = {
-            "screen_name" => entry["from_user"],
-            "profile_image_url" => entry["profile_image_url"],
-          }
-        end
-        unescaped_text = CGI.unescapeHTML(entry["text"] || "")
-        entry["unescaped_text"] = unescaped_text
-        entry["text_html"] = auto_link(unescaped_text)
-        entry["unescaped_source"] = CGI.unescapeHTML(entry["source"] || "")
-        entry["delay_sec"] = (Time.now - Time.parse(entry["created_at"] || "")).to_i()
+        entry["user"] = {
+          "screen_name" => entry["from_user"],
+          "profile_image_url" => entry["profile_image_url"],
+        }
+        entry["now"] = Time.now.to_f()
         if entry["retweeted_status"]
-          convert_entries([entry["retweeted_status"]], type)
+          convert_entries([entry["retweeted_status"]])
         end
       end
     end
@@ -203,43 +200,15 @@ class TSSWebSocketServer
       #    pp entry
       #  end
       #end
+      send_raw(ws, JSON.dump(data))
+    end
+    
+    def send_raw(ws, str)
       begin
-        ws.send(JSON.dump(data))
+        ws.send(str)
       rescue => ex
         print_backtrace(ex)
       end
-    end
-    
-    # Streaming API output has "urls" information but it looks Search API output doesn't.
-    # So I use my hand-made pattern matching.
-    def auto_link(str)
-      pos = 0
-      result = ""
-      uri_exp = URI.regexp(["http", "https", "ftp"])
-      exp = /(^|\s|[^\x20-\x7f])((\#[a-zA-Z\d_]+)|(@[a-zA-Z\d_]+)|(#{uri_exp}))/
-      str.gsub(exp) do
-        m = Regexp.last_match
-        result << CGI.escapeHTML(str[pos...m.begin(0)])
-        prefix = $1
-        if $3
-          text = $3
-          url = "/search?q=" + CGI.escape(text)
-          target = "_self"
-        elsif $4
-          text = $4
-          url = "http://twitter.com/%s" % text.gsub(/^@/, "")
-          target = "_blank"
-        elsif $5
-          text = $5
-          url = text
-          target = "_blank"
-        end
-        result << '%s<a href="%s" target="%s">%s</a>' %
-            [CGI.escapeHTML(prefix), CGI.escapeHTML(url), target, CGI.escapeHTML(text)]
-        pos = m.end(0)
-      end
-      result << CGI.escapeHTML(str[pos..-1])
-      return result
     end
     
     def print_backtrace(ex)
