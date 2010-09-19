@@ -33,6 +33,7 @@
     WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf";
     //WEB_SOCKET_DEBUG = true;
     FRAME_MSEC = 40;
+    ANIMATION_MAX_DELAY_MSEC = 1000;
     
     var query = <%= @query_json %>[0];
     var web_socket_url = "<%= @web_socket_url %>";
@@ -131,9 +132,21 @@
     }
     
     function queryShowEntry(entry) {
+      
       //console.log("queryShowEntry", entry);
+      // Modifies animation speed so that the new entry is displayed in ANIMATION_MAX_DELAY_MSEC
+      // from now.
+      var animation_msec = ANIMATION_MAX_DELAY_MSEC / (displayQue.length + 1);
+      for (var i = 0; i < displayQue.length; ++i) {
+        if (displayQue[i].animation_msec > animation_msec) {
+          displayQue[i].animation_msec = animation_msec;
+        }
+      }
+      entry.animation_msec = animation_msec;
+      
       displayQue.push(entry);
       if (!showing) showEntryInQueue();
+      
     }
     
     function showEntryInQueue() {
@@ -147,8 +160,6 @@
         showing = false;
         return;
       }
-      // Animation speed is calculated so that all entries in the queue is shown in 1 second from now.
-      var duration = 1000 / displayQue.length;
       showing = true;
       var entry = displayQue[0];
       displayQue.splice(0, 1);
@@ -165,14 +176,15 @@
           retweetedEntry = entry.retweeted_status;
         }
         retweetedEntry.last_retweeter = entry.user.screen_name;
-        raiseEntry(retweetedEntry, duration);
+        retweetedEntry.animation_msec = entry.animation_msec;
+        raiseEntry(retweetedEntry);
       } else {
-        prependEntry(entry, duration);
+        prependEntry(entry);
       }
       
     }
     
-    function prependEntry(targetEntry, duration) {
+    function prependEntry(targetEntry) {
       
       if (!targetEntry.statusDiv) createView(targetEntry);
       entries.splice(0, 0, targetEntry);  // inserts the entry to front
@@ -184,7 +196,7 @@
         if (progress > 1) progress = 1;
         $("#result").css("top", -height * (1 - progress));
         if (progress < 1) {
-          progress += FRAME_MSEC / duration;
+          progress += FRAME_MSEC / targetEntry.animation_msec;
           setTimeout(animate, FRAME_MSEC);
         } else {
           setTimeout(showEntryInQueue, FRAME_MSEC);
@@ -194,7 +206,7 @@
       
     }
     
-    function raiseEntry(targetEntry, duration) {
+    function raiseEntry(targetEntry) {
       
       if (!targetEntry.statusDiv) createView(targetEntry);
       
@@ -227,7 +239,7 @@
           movedEntries[i].statusDiv.css("top", -entryHeight * (1 - progress));
         }
         if (progress < 1) {
-          progress += FRAME_MSEC / duration;
+          progress += FRAME_MSEC / targetEntry.animation_msec;
           setTimeout(animate, FRAME_MSEC);
         } else {
           targetEntry.statusDiv.css("z-index", 0);
