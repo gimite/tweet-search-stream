@@ -62,7 +62,8 @@ class TSSWebSocketServer
             :oauth_access_token_secret => session[:access_token_secret],
           }
           query = params["q"][0]
-          thread = Thread.new() do
+          twitter_thread = ws_thread = nil
+          twitter_thread = Thread.new() do
             begin
               res = search(query, auth_params)
               if res["results"]
@@ -82,15 +83,25 @@ class TSSWebSocketServer
             rescue => ex
               print_backtrace(ex)
             end
-            @logger.info("Streaming API connection closed: #{ws.object_id}")
-            ws.close_socket() rescue nil
+            @logger.info("Disconnected by Twitter: #{ws.object_id}")
+            while !ws_thread; end
+            # ws.close_socket() here doesn't unblock ws.receive() in Ruby 1.9.
+            # I don't use ws.close() here either because it may not be supported by WebSocket
+            # client implementation based on old protocol.
+            ws_thread.kill()
           end
-          begin
-            while ws.receive()
+          ws_thread = Thread.new() do
+            begin
+              while ws.receive()
+              end
+            rescue => ex
             end
-          rescue => ex
+            @logger.info("Disconnected by user: #{ws.object_id}")
+            while !twitter_thread; end
+            twitter_thread.kill()
           end
-          thread.kill()
+          twitter_thread.join()
+          ws_thread.join()
         else
           ws.handshake("404 Not Found")
         end
