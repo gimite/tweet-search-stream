@@ -41,7 +41,6 @@
     var entries = [];
     var displayQue = [];
     var showing = false;
-    var clock = 0;
     var errorShown = false;
     
     function onLoad() {
@@ -77,7 +76,7 @@
     
     function startClockTimer() {
       setInterval(function() {
-        ++clock;
+        updateTweetsPerSec();
         for (var i = 0; i < entries.length; ++i) {
           updateDate(entries[i]);
         }
@@ -91,7 +90,7 @@
       if (result.entries) {
         for (var i = 0; i < result.entries.length; ++i) {
           var entry = result.entries[i];
-          convertEntry(entry);
+          convertEntry(entry, first);
           if (first) {
             if (!entry.retweeted_status) {
               createView(entry);
@@ -107,18 +106,22 @@
         } else if (first) {
           $("#result-message").text("No tweets found.");
         }
+        if (first) updateTweetsPerSec();
       } else {
         showError("Error: " + result.error);
       }
     }
     
-    function convertEntry(entry) {
+    function convertEntry(entry, first) {
       entry.unescaped_text = unescapeHtml(entry.text || "");
       entry.unescaped_source = unescapeHtml(entry.source || "");
+      // Local clock may be inaccurate, so recalculates the creation time in local clock.
       // IE doesn't accept +0000 format.
-      var createdAt = new Date(entry.created_at.replace(/\+0000/, "UTC"));
-      var now = new Date(entry.now * 1000);
-      entry.created_clock = clock - Math.floor((now - createdAt) / 1000);
+      var remoteCreatedAt = new Date(entry.created_at.replace(/\+0000/, "UTC"));
+      var remoteNow = new Date(entry.now * 1000);
+      var localNow = new Date();
+      entry.local_created_at = localNow.getTime() - (remoteNow - remoteCreatedAt);
+      entry.local_received_at = first ? entry.local_created_at : localNow.getTime();
       if (entry.retweeted_status) {
         entry.retweeted_status.now = entry.now;
         convertEntry(entry.retweeted_status);
@@ -292,6 +295,27 @@
       entry.dateAnchor.text(getDateStr(entry));
     }
     
+    function updateTweetsPerSec() {
+      var tps = getTweetsPerSec();
+      $("#tps").text("(" + tps.toFixed(3) + " tweets/sec)");
+    }
+    
+    function getTweetsPerSec() {
+      var allEntries = displayQue.concat(entries);
+      var localNow = new Date().getTime();
+      var oldestReceivedAt = localNow;
+      var numTweets = 0;
+      for (var i = 0; i < allEntries.length; ++i) {
+        if (allEntries[i].retweeted_status || allEntries[i].last_retweeter) continue;
+        ++numTweets;
+        oldestReceivedAt = allEntries[i].local_received_at;
+      }
+      var durationSec = (localNow - oldestReceivedAt) / 1000;
+      var tps = durationSec == 0 ? 0 : numTweets / durationSec;
+      //console.log("tps", tps, numTweets, durationSec);
+      return tps;
+    }
+    
     // Streaming API output has "urls" information but it looks Search API output doesn't.
     // So I use my hand-made pattern matching.
     function autoLink(str, elem) {
@@ -339,7 +363,7 @@
     }
     
     function getDateStr(entry) {
-      var secAgo = clock - entry.created_clock;
+      var secAgo = Math.floor((new Date().getTime() - entry.local_created_at) / 1000);
       if (secAgo == 1) {
         return "1 second ago";
       } else if (secAgo <= 5) {
@@ -424,7 +448,10 @@
   </form>
   
   <% if !@query.empty? %>
-    <div class="summary center-column">Search result for <span class="query"><%=h @query %></span></div>
+    <div class="summary center-column">
+      Search result for <span class="query"><%=h @query %></span>
+      <span id="tps"></span>
+    </div>
   <% end %>
   
   <div class="container">
