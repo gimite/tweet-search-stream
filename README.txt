@@ -3,10 +3,9 @@ This is source code of http://tweet-search-stream.gimite.net/ .
 
 * How to run
 
-$ sudo gem install daemons json oauth twitter sinatra thin
+$ sudo gem install daemons json oauth twitter sinatra thin moji
 
 - Install web-socket-ruby from http://github.com/gimite/web-socket-ruby
-- Install moji from http://gimite.ddo.jp/gimite/rubymess/moji-1.4.tar.gz
 
 $ cp tss_config.rb.sample tss_config.rb
 
