@@ -3,7 +3,7 @@
 # Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
 # License: New BSD License
 
-$KCODE = "u"
+$KCODE = "u" if RUBY_VERSION < "1.9.0"
 
 require "securerandom"
 require "net/http"
@@ -33,7 +33,7 @@ class TSSWebSocketServer
       @logger = logger || Logger.new(STDERR)
       if !test_only
         params = {
-          :accepted_domains => URI.parse(TSSConfig::BASE_URL).host,
+          :accepted_domains => [URI.parse(TSSConfig::BASE_URL).host],
           :port => TSSConfig::WEB_SOCKET_SERVER_PORT,
         }
         @server = WebSocketServer.new(params)
@@ -190,17 +190,21 @@ class TSSWebSocketServer
     end
     
     def send(ws, data)
-      #if data["entries"]
-      #  for entry in data["entries"]
-      #    if entry["retweeted_status"]
-      #      puts("rt: " + entry["retweeted_status"]["unescaped_text"])
-      #    else
-      #      puts(entry["user"]["screen_name"] + ": " + entry["unescaped_text"])
-      #    end
-      #    pp entry
-      #  end
-      #end
+      #print_data(data)
       send_raw(ws, JSON.dump(data))
+    end
+    
+    def print_data(data)
+      if data["entries"]
+        for entry in data["entries"]
+          if entry["retweeted_status"]
+            puts("rt: " + entry["retweeted_status"]["text"])
+          else
+            puts(entry["user"]["screen_name"] + ": " + entry["text"])
+          end
+          #pp entry
+        end
+      end
     end
     
     def send_raw(ws, str)

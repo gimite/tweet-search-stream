@@ -3,7 +3,7 @@
 # Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
 # License: New BSD License
 
-$KCODE = "u"
+$KCODE = "u" if RUBY_VERSION < "1.9.0"
 
 require "securerandom"
 require "net/http"

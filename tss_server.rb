@@ -4,7 +4,7 @@
 # Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
 # License: New BSD License
 
-$KCODE = "u"
+$KCODE = "u" if RUBY_VERSION < "1.9.0"
 $LOAD_PATH << "."
 $LOAD_PATH << "./lib"
 Thread.abort_on_exception = true
