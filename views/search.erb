@@ -297,7 +297,11 @@
     
     function updateTweetsPerSec() {
       var tps = getTweetsPerSec();
-      $("#tps").text("(" + tps.toFixed(3) + " tweets/sec)");
+      if (tps > 0) {
+        $("#tps").text("(" + tps.toFixed(3) + " tweets/sec)");
+      } else {
+        $("#tps").empty();
+      }
     }
     
     function getTweetsPerSec() {
