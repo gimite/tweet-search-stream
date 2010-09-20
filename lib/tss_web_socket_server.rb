@@ -54,7 +54,7 @@ class TSSWebSocketServer
             (k, v) = field.split(/=/, 2)
             cookie[k] = CGI.unescape(v)
           end
-          session_id = cookie[TSSWebServer::COOKIE_KEY]
+          session_id = cookie[TSSConfig::SESSION_COOKIE_KEY]
           raise("session_id missing") if !session_id
           session = Session.get(session_id)
           auth_params = {

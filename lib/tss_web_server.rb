@@ -26,8 +26,6 @@ require "tss_config"
 
 class TSSWebServer < Sinatra::Base
     
-    COOKIE_KEY = "session"
-    
     set(:port, TSSConfig::WEB_SERVER_PORT)
     set(:environment, TSSConfig::SINATRA_ENVIRONMENT)
     set(:public, "./public")
@@ -38,11 +36,11 @@ class TSSWebServer < Sinatra::Base
     end
 
     before() do
-      session_id = request.cookies[COOKIE_KEY]
+      session_id = request.cookies[TSSConfig::SESSION_COOKIE_KEY]
       @session = session_id ? Session.get(session_id) : nil
       @session ||= Session.new()
-      response.set_cookie(COOKIE_KEY,
-          {:value => @session.id, :expires => Time.now + 3 * 30 * 24 * 3600})
+      response.set_cookie(TSSConfig::SESSION_COOKIE_KEY,
+          {:value => @session.id, :path => "/", :expires => Time.now + 3 * 30 * 24 * 3600})
       @twitter = get_twitter(@session[:access_token], @session[:access_token_secret])
     end
     
