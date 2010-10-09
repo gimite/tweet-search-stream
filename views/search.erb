@@ -5,6 +5,8 @@
 -->
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="description" content="This is real time Twitter search using Twitter Streaming API.
+    New tweets are automatically shown in a few seconds after posting.">
   <% if @title %>
     <title><%=h @title %></title>
   <% elsif !@query.empty? && !@index %>
@@ -447,6 +449,12 @@
   </h1>
   
   <form class="query-form center-column" action="/search" method="GET">
+    <% if @index %>
+      <p>
+        This is real time Twitter search using Twitter Streaming API.
+        New tweets are automatically shown in a few seconds after posting.
+      </p>
+    <% end %>
     <div>
       <input type="text" id="query-field" name="q" value="<%=h @query %>" size="30">
       <input type="submit" value="Search">
