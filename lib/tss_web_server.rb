@@ -92,11 +92,7 @@ class TSSWebServer < Sinatra::Base
     get("/buzz") do
       result = []
       for (lang_id, lang_name) in [["en", "English"], ["ja", "Japanese"]]
-        words = get_buzz_words(lang_id)
-        if lang_id == "ja"
-          words = words.grep(/^\#/)
-        end
-        words = words[0, 10]
+        words = get_buzz_words(lang_id).grep(/^\#[a-zA-Z0-9_]+$/)[0, 10]
         result.push({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
       end
       content_type("text/javascript", :charset => "utf-8")
