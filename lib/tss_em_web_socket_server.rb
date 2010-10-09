@@ -29,6 +29,8 @@ require "tss_web_server"
 
 class TSSEMWebSocketServer
     
+    DEFAULT_RECONNECT_WAIT_SEC = 10
+    
     def self.schedule()
       TSSEMWebSocketServer.new().schedule()
     end
@@ -36,12 +38,18 @@ class TSSEMWebSocketServer
     def initialize(logger = nil)
       @logger = logger || Logger.new(STDERR)
       @oauth_consumer = OAuth::Consumer.new(
-        TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET, :site => "http://twitter.com")
+        TSSConfig::TWITTER_API_KEY,
+        TSSConfig::TWITTER_API_SECRET,
+        :site => "http://twitter.com")
       @oauth_access_token = OAuth::AccessToken.new(
-        @oauth_consumer, TSSConfig::TEST_ACCESS_TOKEN, TSSConfig::TEST_ACCESS_TOKEN_SECRET)
+        @oauth_consumer,
+        TSSConfig::TWITTER_API_ACCESS_TOKEN,
+        TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET)
       @query_to_wsocks = {}
       @stream_http = nil
       @stream_state = :idle
+      @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
+      @recent_reconnections = [Time.at(0)] * 3
     end
     
     def schedule()
@@ -60,7 +68,7 @@ class TSSEMWebSocketServer
     def on_web_socket_open(ws)
       never_die() do
         
-        @logger.info("%d: Connected" % ws.object_id)
+        @logger.info("[websock %d] Connected" % ws.object_id)
         uri = URI.parse(ws.request["Path"])
         params = CGI.parse(uri.query)
         if uri.path != "/" || params["q"].empty?
@@ -75,7 +83,7 @@ class TSSEMWebSocketServer
             message = (res && res["error"]) ? res["error"] : "Search API failed."
             send(ws, {"error" => message})
             ws.close_connection_after_writing()
-            return
+            next
           end
           entries = res["results"].reverse()
           convert_entries(entries)
@@ -84,7 +92,7 @@ class TSSEMWebSocketServer
           if !(query =~ /\A\#[a-z0-9_]+\z/)
             send(ws, {"error" => "Auto update works only for hash tags."})
             ws.close_connection_after_writing()
-            return
+            next
           end
           if @stream_state == :connected && @query_to_wsocks.has_key?(query)
             @query_to_wsocks[query].push(ws)
@@ -100,8 +108,36 @@ class TSSEMWebSocketServer
       end
     end
     
-    def reconnect_to_stream(force = false)
-      return if !force && @stream_state == :will_reconnect
+    def on_web_socket_close(ws)
+      never_die() do
+        @logger.info("[websock %d] Disconnected" % ws.object_id)
+        unregister_web_socket(ws)
+      end
+    end
+    
+    def on_web_socket_error(ws, reason)
+      never_die() do
+        @logger.info("[websock %d] WebSocket error: %p" % [ws.object_id, reason])
+        unregister_web_socket(ws)
+      end
+    end
+    
+    def reconnect_to_stream(by_timer = false)
+      
+      if !by_timer && @stream_state == :will_reconnect
+        @logger.info("[stream] Waiting for reconnection, reconnection ignored")
+        return
+      end
+      
+      # If this is 4th reconnection in 60 sec, wait for 60 sec,
+      # to avoid Twitter API error.
+      if @recent_reconnections[0] >= Time.now - 60
+        reconnect_later(60)
+        return
+      end
+      @recent_reconnections.push(Time.now)
+      @recent_reconnections.shift()
+      
       if @stream_state == :connected
         @stream_http.close_connection()
         @stream_http = nil
@@ -113,7 +149,14 @@ class TSSEMWebSocketServer
         return
       end
       query = @query_to_wsocks.keys.join(",")
+      
       @stream_http = http = get_search_stream(query, {
+        :on_connect => proc() do
+          if http.response_header.status == 200
+            @logger.info("[stream %d] Connected" % http.object_id)
+            @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
+          end
+        end,
         :on_entry => proc() do |json|
           if json =~ /"text":"(([^"\\]|\\.)*)"/
             text = $1.downcase
@@ -129,37 +172,25 @@ class TSSEMWebSocketServer
           end
         end,
         :on_close => proc() do
-          @logger.info("%d: stream closed: status=%d body=%s" %
+          @logger.info("[stream %d] Closed: status=%p body=%p" %
             [http.object_id, http.response_header.status, http.response])
-          if http == @stream_http  # Otherwise it's disconnected for reconnection.
-            @logger.info("reconnect in 10 sec")
-            EventMachine.add_timer(10) do
-              reconnect_to_stream(true)
-            end
-            @stream_state = :will_reconnect
+          if http == @stream_http  # Otherwise it's intentionally disconnected for reconnection.
+            reconnect_later(@reconnect_wait_sec)
+            @reconnect_wait_sec = [@reconnect_wait_sec * 2, 240].min
           end
         end,
       })
-      @logger.info("%d: reconnect to stream: query=%s" % [http.object_id, query])
+      @logger.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
       @stream_state = :connected
+      
     end
     
-    def dump_connections()
-      @logger.info("connections: %p" % [@query_to_wsocks.map(){ |k, v| [k, v.size] }])
-    end
-    
-    def on_web_socket_close(ws)
-      never_die() do
-        @logger.info("%d: Disconnected" % ws.object_id)
-        unregister_web_socket(ws)
+    def reconnect_later(wait_sec)
+      @logger.info("[stream] Reconnect in %d sec" % wait_sec)
+      EventMachine.add_timer(wait_sec) do
+        reconnect_to_stream(true)
       end
-    end
-    
-    def on_web_socket_error(ws, reason)
-      never_die() do
-        @logger.info("%d: WebSocket error: %p" % [ws.object_id, reason])
-        unregister_web_socket(ws)
-      end
+      @stream_state = :will_reconnect
     end
     
     def unregister_web_socket(ws)
@@ -170,19 +201,8 @@ class TSSEMWebSocketServer
           break
         end
       end
-      @logger.warn("%d: unregistered socket not found" % ws.object_id) if !found
+      @logger.info("[websock %d] Unregistered socket not found" % ws.object_id) if !found
       dump_connections()
-    end
-    
-    def oauth_post_request(url, params, options = {})
-      request = EventMachine::HttpRequest.new(url)
-      base_options = {
-        :body => params,
-        :head => {"Content-Type" => "application/x-www-form-urlencoded"},
-      }
-      return request.post(base_options.merge(options)) do |client|
-        @oauth_consumer.sign!(client, @oauth_access_token)
-      end
     end
     
     def get_search_stream(query, params)
@@ -191,22 +211,25 @@ class TSSEMWebSocketServer
         {"track" => query},
         {:timeout => 0})  # Disables timeout.
       buffer = ""
+      connected = false
       http.stream do |chunk|
         never_die() do
+          if !connected
+            params[:on_connect].call()
+            connected = true
+          end
           buffer << chunk
           while buffer.slice!(/\A(.*)\r\n/n)
             params[:on_entry].call($1)
           end
         end
       end
-      http.callback() do |*args|
+      http.callback() do
         never_die() do
-          p [:callback, args]
           params[:on_close].call()
-          #puts "Response: #{http.response} (Code: #{http.response_header.status})"
         end
       end
-      http.errback() do |*args|
+      http.errback() do
         never_die() do
           params[:on_close].call()
         end
@@ -221,13 +244,17 @@ class TSSEMWebSocketServer
         "http://search.twitter.com/search.json",
         {"q" => query, "rpp" => 50, "result_type" => "recent"},
         :timeout => 30)
+      @logger.info("[search %d] Fetching query=%p" % [http.object_id, query])
       http.callback() do
         never_die() do
-          yield(http.response)
+          @logger.info(
+            "[search %d] Fetched status=%p" % [http.object_id, http.response_header.status])
+          yield(http.response_header.status == 200 ? http.response : nil)
         end
       end
       http.errback() do
         never_die() do
+          @logger.info("[search %d] Failed" % http.object_id)
           yield(nil)
         end
       end
@@ -238,6 +265,17 @@ class TSSEMWebSocketServer
         yield()
       rescue => ex
         print_backtrace(ex)
+      end
+    end
+    
+    def oauth_post_request(url, params, options = {})
+      request = EventMachine::HttpRequest.new(url)
+      base_options = {
+        :body => params,
+        :head => {"Content-Type" => "application/x-www-form-urlencoded"},
+      }
+      return request.post(base_options.merge(options)) do |client|
+        @oauth_consumer.sign!(client, @oauth_access_token)
       end
     end
     
@@ -271,6 +309,10 @@ class TSSEMWebSocketServer
           #pp entry
         end
       end
+    end
+    
+    def dump_connections()
+      @logger.info("[websock] connections=%p" % [@query_to_wsocks.map(){ |k, v| [k, v.size] }])
     end
     
     def print_backtrace(ex)

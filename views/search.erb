@@ -429,7 +429,9 @@
   </script>
 </head><body>
   
-  <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
+  <% if false %>
+    <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
+  <% end %>
   
   <h1 class="center-column">
     <% if @logo_url %>
@@ -462,7 +464,7 @@
     
     <div id="left-column" class="left-column">
       <div class="buzz-nav"><img id="close-left-button" src="/images/cross.png" title="Hide hot words"></div>
-      <div class="buzz-title">Hot words</div>
+      <div class="buzz-title">Hot hash tags</div>
       <div id="buzz" class="buzz">Loading...</div>
       <div class="buzz-footer">
         <div>Powered by <a href="http://buzztter.com/" target="_blank">buzztter</a></div>

@@ -65,8 +65,8 @@ class TSSWebSocketServer
           raise("session_id missing") if !session_id
           session = Session.get(session_id)
           auth_params = {
-            :oauth_access_token => TSSConfig::TEST_ACCESS_TOKEN,
-            :oauth_access_token_secret => TSSConfig::TEST_ACCESS_TOKEN_SECRET
+            :oauth_access_token => TSSConfig::TWITTER_API_ACCESS_TOKEN,
+            :oauth_access_token_secret => TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET
           }
           query = params["q"][0].downcase
           stream_enabled = false

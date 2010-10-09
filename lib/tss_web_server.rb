@@ -121,24 +121,23 @@ class TSSWebServer < Sinatra::Base
     end
 
     def oauth_consumer
-      return OAuth::Consumer.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET, :site => "http://twitter.com")
+      return OAuth::Consumer.new(
+        TSSConfig::TWITTER_API_KEY,
+        TSSConfig::TWITTER_API_SECRET,
+        :site => "http://twitter.com")
     end
 
     def search(query, index)
-      if @twitter
-        @query = query
-        @query_json = JSON.dump([@query])
-        @index = index
-        @web_socket_url = "ws://%s:%d/" % [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
-        @screen_name = @session[:screen_name]
-        @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
-        @title = params[:title]
-        @logo_url = params[:logo]
-        erb(:search)
-      else
-        @current_url = request.path + (request.query_string.empty? ? "" : "?" + request.query_string)
-        erb(:login_form)
-      end
+      @query = query
+      @query_json = JSON.dump([@query])
+      @index = index
+      @web_socket_url = "ws://%s:%d/" %
+        [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
+      @screen_name = @session[:screen_name]
+      @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
+      @title = params[:title]
+      @logo_url = params[:logo]
+      erb(:search)
     end
     
     def get_buzz_words(lang_id)
