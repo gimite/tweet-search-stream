@@ -17,6 +17,7 @@ require "daemons"
 
 require "tss_web_server"
 require "tss_web_socket_server"
+require "tss_em_web_socket_server"
 
 
 #WebSocket.debug = true
@@ -31,7 +32,6 @@ opts = {
 Daemons.run_proc("tss_server", opts) do
   FileUtils.cd(root_dir)
   Session.start_auto_save()
-  server = TSSWebSocketServer.new()
-  Thread.new(){ server.run() }
+  TSSEMWebSocketServer.schedule()
   TSSWebServer.run!()
 end
