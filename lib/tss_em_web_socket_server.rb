@@ -260,14 +260,6 @@ class TSSEMWebSocketServer
       end
     end
     
-    def never_die(&block)
-      begin
-        yield()
-      rescue => ex
-        print_backtrace(ex)
-      end
-    end
-    
     def oauth_post_request(url, params, options = {})
       request = EventMachine::HttpRequest.new(url)
       base_options = {
@@ -313,6 +305,14 @@ class TSSEMWebSocketServer
     
     def dump_connections()
       @logger.info("[websock] connections=%p" % [@query_to_wsocks.map(){ |k, v| [k, v.size] }])
+    end
+    
+    def never_die(&block)
+      begin
+        yield()
+      rescue => ex
+        print_backtrace(ex)
+      end
     end
     
     def print_backtrace(ex)
