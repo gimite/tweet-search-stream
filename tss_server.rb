@@ -16,7 +16,6 @@ require "rubygems"
 require "daemons"
 
 require "tss_web_server"
-require "tss_web_socket_server"
 require "tss_em_web_socket_server"
 
 
