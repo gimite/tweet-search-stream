@@ -35,6 +35,7 @@ class TSSWebServer < Sinatra::Base
       include(ERB::Util)
     end
 
+=begin
     before() do
       session_id = request.cookies[TSSConfig::SESSION_COOKIE_KEY]
       @session = session_id ? Session.get(session_id) : nil
@@ -43,7 +44,8 @@ class TSSWebServer < Sinatra::Base
           {:value => @session.id, :path => "/", :expires => Time.now + 3 * 30 * 24 * 3600})
       @twitter = get_twitter(@session[:access_token], @session[:access_token_secret])
     end
-    
+=end
+
     get("/") do
       buzz_words = get_buzz_words("en")
       query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
@@ -55,6 +57,7 @@ class TSSWebServer < Sinatra::Base
       search(query, false)
     end
     
+=begin
     post("/login") do
       callback_url = "#{TSSConfig::BASE_URL}/oauth_callback?redirect=" + CGI.escape(params[:redirect] || "")
       request_token = self.oauth_consumer.get_request_token(:oauth_callback => callback_url)
@@ -88,6 +91,7 @@ class TSSWebServer < Sinatra::Base
         redirect("/")
       end
     end
+=end
     
     get("/buzz") do
       result = []
@@ -99,10 +103,12 @@ class TSSWebServer < Sinatra::Base
       return JSON.dump(result)
     end
 
+=begin
     get("/logout") do
       @session.clear()
       redirect("/")
     end
+=end
     
     get("/css/default.css") do
       @webkit = request.user_agent =~ /AppleWebKit/
@@ -133,7 +139,7 @@ class TSSWebServer < Sinatra::Base
       @index = index
       @web_socket_url = "ws://%s:%d/" %
         [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
-      @screen_name = @session[:screen_name]
+#      @screen_name = @session[:screen_name]
       @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
       @title = params[:title]
       @logo_url = params[:logo]

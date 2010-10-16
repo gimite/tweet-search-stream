@@ -30,7 +30,6 @@ opts = {
 }
 Daemons.run_proc("tss_server", opts) do
   FileUtils.cd(root_dir)
-  Session.start_auto_save()
   TSSEMWebSocketServer.schedule()
   TSSWebServer.run!()
 end

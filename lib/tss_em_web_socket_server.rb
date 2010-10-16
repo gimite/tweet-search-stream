@@ -23,7 +23,6 @@ require "em-http"
 # require "twitter/json_stream"
 
 require "tss_config"
-require "session"
 require "tss_web_server"
 
 
