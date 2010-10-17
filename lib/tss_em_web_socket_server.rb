@@ -149,7 +149,15 @@ class TSSEMWebSocketServer
       end
       query = @query_to_wsocks.keys.join(",")
       
-      @stream_http = http = get_search_stream(query, {
+      http = nil
+      start_search_stream(query, {
+        :on_init => proc() do |h|
+          # It seems it's possible that on_close is called immediately before start_search_stream()
+          # returns, so I need to assign to http here.
+          @stream_http = http = h
+          @logger.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
+          @stream_state = :connected
+        end,
         :on_connect => proc() do
           if http.response_header.status == 200
             @logger.info("[stream %d] Connected" % http.object_id)
@@ -171,16 +179,18 @@ class TSSEMWebSocketServer
           end
         end,
         :on_close => proc() do
-          @logger.info("[stream %d] Closed: status=%p body=%p" %
-            [http.object_id, http.response_header.status, http.response])
-          if http == @stream_http  # Otherwise it's intentionally disconnected for reconnection.
+          if http == @stream_http
+            @logger.info("[stream %d] Closed unexpectedly: status=%p body=%p" %
+              [http.object_id, http.response_header.status, http.response])
             reconnect_later(@reconnect_wait_sec)
             @reconnect_wait_sec = [@reconnect_wait_sec * 2, 240].min
+          else
+            # Intentionally disconnected to reconnect with a new query.
+            @logger.info("[stream %d] Closed intentionally: status=%p body=%p" %
+              [http.object_id, http.response_header.status, http.response])
           end
         end,
       })
-      @logger.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
-      @stream_state = :connected
       
     end
     
@@ -204,11 +214,12 @@ class TSSEMWebSocketServer
       dump_connections()
     end
     
-    def get_search_stream(query, params)
+    def start_search_stream(query, params)
       http = oauth_post_request(
         "http://stream.twitter.com/1/statuses/filter.json",
         {"track" => query},
         {:timeout => 0})  # Disables timeout.
+      params[:on_init].call(http)
       buffer = ""
       connected = false
       http.stream do |chunk|
@@ -233,7 +244,6 @@ class TSSEMWebSocketServer
           params[:on_close].call()
         end
       end
-      return http
     end
     
     def search(query, &block)
