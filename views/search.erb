@@ -36,6 +36,7 @@
     //WEB_SOCKET_DEBUG = true;
     FRAME_MSEC = 40;
     ANIMATION_MAX_DELAY_MSEC = 1000;
+    PING_INTERVAL_MSEC = 5 * 60 * 1000;
     
     var query = <%= @query_json %>[0];
     var web_socket_url = "<%= @web_socket_url %>";
@@ -68,9 +69,7 @@
       var url = web_socket_url + "?q=" + encodeURIComponent(query);
       console.log("openWebSocket", url);
       ws = new WebSocket(url);
-      ws.onopen = function() {
-        console.log("ws.onopen");
-      };
+      ws.onopen = onWebSocketOpen;
       ws.onmessage = onWebSocketMessage;
       ws.onclose = onWebSocketClosed;
       ws.onerror = onWebSocketClosed;
@@ -83,6 +82,13 @@
           updateDate(entries[i]);
         }
       }, 1000);
+    }
+    
+    function onWebSocketOpen() {
+      console.log("ws.onopen");
+      setInterval(function() {
+        ws.send("");  // Sends ping.
+      }, PING_INTERVAL_MSEC);
     }
     
     function onWebSocketMessage(e) {

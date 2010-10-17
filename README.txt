@@ -3,7 +3,7 @@ This is source code of http://tweet-search-stream.gimite.net/ .
 
 * How to run
 
-$ sudo gem install daemons json oauth twitter sinatra thin moji em-http-request em-websocket
+$ sudo gem install daemons json oauth twitter sinatra thin moji em-http-request em-websocket async_sinatra
 $ cp tss_config.rb.sample tss_config.rb
 
 - Edit tss_config.rb for your environment

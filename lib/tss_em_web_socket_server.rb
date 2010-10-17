@@ -24,18 +24,22 @@ require "em-http"
 
 require "tss_config"
 require "tss_web_server"
+require "tss_helper"
 
 
 class TSSEMWebSocketServer
     
+    include(TSSHelper)
+    
     DEFAULT_RECONNECT_WAIT_SEC = 10
+    # Must be somewhat longer than PING_INTERVAL_MSEC in view/search.erb.
+    PING_TIMEOUT_SEC = 6 * 60
     
     def self.schedule()
       TSSEMWebSocketServer.new().schedule()
     end
     
-    def initialize(logger = nil)
-      @logger = logger || Logger.new(STDERR)
+    def initialize()
       @oauth_consumer = OAuth::Consumer.new(
         TSSConfig::TWITTER_API_KEY,
         TSSConfig::TWITTER_API_SECRET,
@@ -45,6 +49,7 @@ class TSSEMWebSocketServer
         TSSConfig::TWITTER_API_ACCESS_TOKEN,
         TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET)
       @query_to_wsocks = {}
+      @wsock_to_last_access = {}
       @stream_http = nil
       @stream_state = :idle
       @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
@@ -57,17 +62,18 @@ class TSSEMWebSocketServer
         EventMachine::WebSocket.start(:host => "0.0.0.0", :port => port) do |ws|
           ws.onopen(){ on_web_socket_open(ws) }
           ws.onclose(){ on_web_socket_close(ws) }
-          ws.onmessage(){ }
+          ws.onmessage(){ |m| on_web_socket_message(ws, m) }
           ws.onerror(){ |r| on_web_socket_error(ws, r) }
         end
-        @logger.info("WebSocket Server is running: port=%d" % port)
+        EventMachine.add_periodic_timer(PING_TIMEOUT_SEC){ on_gc_timer() }
+        LOGGER.info("WebSocket Server is running: port=%d" % port)
       end
     end
     
     def on_web_socket_open(ws)
       never_die() do
         
-        @logger.info("[websock %d] Connected" % ws.object_id)
+        LOGGER.info("[websock %d] Connected" % ws.object_id)
         uri = URI.parse(ws.request["Path"])
         params = CGI.parse(uri.query)
         if uri.path != "/" || params["q"].empty?
@@ -94,11 +100,10 @@ class TSSEMWebSocketServer
             next
           end
           if @stream_state == :connected && @query_to_wsocks.has_key?(query)
-            @query_to_wsocks[query].push(ws)
+            register_web_socket(query, ws)
             dump_connections()
           else
-            @query_to_wsocks[query] ||= []
-            @query_to_wsocks[query].push(ws)
+            register_web_socket(query, ws)
             reconnect_to_stream()
           end
           
@@ -107,24 +112,41 @@ class TSSEMWebSocketServer
       end
     end
     
+    def on_web_socket_message(ws, message)
+      never_die() do
+        @wsock_to_last_access[ws] = Time.now
+      end
+    end
+    
     def on_web_socket_close(ws)
       never_die() do
-        @logger.info("[websock %d] Disconnected" % ws.object_id)
+        LOGGER.info("[websock %d] Disconnected" % ws.object_id)
         unregister_web_socket(ws)
       end
     end
     
     def on_web_socket_error(ws, reason)
       never_die() do
-        @logger.info("[websock %d] WebSocket error: %p" % [ws.object_id, reason])
+        LOGGER.info("[websock %d] WebSocket error: %p" % [ws.object_id, reason])
         unregister_web_socket(ws)
+      end
+    end
+    
+    def on_gc_timer()
+      never_die() do
+        now = Time.now
+        for ws, la in @wsock_to_last_access.select(){ |ws, la| la < now - PING_TIMEOUT_SEC }
+          LOGGER.info("[websock %d] WebSocket timeout" % ws.object_id)
+          ws.close_connection()
+          unregister_web_socket(ws)
+        end
       end
     end
     
     def reconnect_to_stream(by_timer = false)
       
       if !by_timer && @stream_state == :will_reconnect
-        @logger.info("[stream] Waiting for reconnection, reconnection ignored")
+        LOGGER.info("[stream] Waiting for reconnection, reconnection ignored")
         return
       end
       
@@ -155,12 +177,12 @@ class TSSEMWebSocketServer
           # It seems it's possible that on_close is called immediately before start_search_stream()
           # returns, so I need to assign to http here.
           @stream_http = http = h
-          @logger.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
+          LOGGER.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
           @stream_state = :connected
         end,
         :on_connect => proc() do
           if http.response_header.status == 200
-            @logger.info("[stream %d] Connected" % http.object_id)
+            LOGGER.info("[stream %d] Connected" % http.object_id)
             @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
           end
         end,
@@ -180,13 +202,13 @@ class TSSEMWebSocketServer
         end,
         :on_close => proc() do
           if http == @stream_http
-            @logger.info("[stream %d] Closed unexpectedly: status=%p body=%p" %
+            LOGGER.info("[stream %d] Closed unexpectedly: status=%p body=%p" %
               [http.object_id, http.response_header.status, http.response])
             reconnect_later(@reconnect_wait_sec)
             @reconnect_wait_sec = [@reconnect_wait_sec * 2, 240].min
           else
             # Intentionally disconnected to reconnect with a new query.
-            @logger.info("[stream %d] Closed intentionally: status=%p body=%p" %
+            LOGGER.info("[stream %d] Closed intentionally: status=%p body=%p" %
               [http.object_id, http.response_header.status, http.response])
           end
         end,
@@ -195,11 +217,17 @@ class TSSEMWebSocketServer
     end
     
     def reconnect_later(wait_sec)
-      @logger.info("[stream] Reconnect in %d sec" % wait_sec)
+      LOGGER.info("[stream] Reconnect in %d sec" % wait_sec)
       EventMachine.add_timer(wait_sec) do
         reconnect_to_stream(true)
       end
       @stream_state = :will_reconnect
+    end
+    
+    def register_web_socket(query, ws)
+      @query_to_wsocks[query] ||= []
+      @query_to_wsocks[query].push(ws)
+      @wsock_to_last_access[ws] = Time.now
     end
     
     def unregister_web_socket(ws)
@@ -210,7 +238,8 @@ class TSSEMWebSocketServer
           break
         end
       end
-      @logger.info("[websock %d] Unregistered socket not found" % ws.object_id) if !found
+      LOGGER.info("[websock %d] Unregistered socket not found" % ws.object_id) if !found
+      @wsock_to_last_access.delete(ws)
       dump_connections()
     end
     
@@ -253,17 +282,17 @@ class TSSEMWebSocketServer
         "http://search.twitter.com/search.json",
         {"q" => query, "rpp" => 50, "result_type" => "recent"},
         :timeout => 30)
-      @logger.info("[search %d] Fetching query=%p" % [http.object_id, query])
+      LOGGER.info("[search %d] Fetching: query=%p" % [http.object_id, query])
       http.callback() do
         never_die() do
-          @logger.info(
-            "[search %d] Fetched status=%p" % [http.object_id, http.response_header.status])
+          LOGGER.info(
+            "[search %d] Fetched: status=%p" % [http.object_id, http.response_header.status])
           yield(http.response_header.status == 200 ? http.response : nil)
         end
       end
       http.errback() do
         never_die() do
-          @logger.info("[search %d] Failed" % http.object_id)
+          LOGGER.info("[search %d] Failed" % http.object_id)
           yield(nil)
         end
       end
@@ -313,22 +342,7 @@ class TSSEMWebSocketServer
     end
     
     def dump_connections()
-      @logger.info("[websock] connections=%p" % [@query_to_wsocks.map(){ |k, v| [k, v.size] }])
+      LOGGER.info("[websock] connections=%p" % [@query_to_wsocks.map(){ |k, v| [k, v.size] }])
     end
     
-    def never_die(&block)
-      begin
-        yield()
-      rescue => ex
-        print_backtrace(ex)
-      end
-    end
-    
-    def print_backtrace(ex)
-      @logger.error("%s: %s (%p)" % [ex.backtrace[0], ex.message, ex.class])
-      for s in ex.backtrace[1..-1]
-        @logger.error("        %s" % s)
-      end
-    end
-
 end

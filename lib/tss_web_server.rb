@@ -19,22 +19,25 @@ require "json"
 require "oauth"
 require "twitter"
 require "sinatra/base"
+require "sinatra/async"
+require "em-http"
 
 require "moji"
 require "tss_config"
+require "tss_helper"
 
 
 class TSSWebServer < Sinatra::Base
+    
+    include(TSSHelper)
+    include(ERB::Util)
     
     set(:port, TSSConfig::WEB_SERVER_PORT)
     set(:environment, TSSConfig::SINATRA_ENVIRONMENT)
     set(:public, "./public")
     set(:logging, true)
+    register(Sinatra::Async)
     
-    helpers() do
-      include(ERB::Util)
-    end
-
 =begin
     before() do
       session_id = request.cookies[TSSConfig::SESSION_COOKIE_KEY]
@@ -46,15 +49,18 @@ class TSSWebServer < Sinatra::Base
     end
 =end
 
-    get("/") do
-      buzz_words = get_buzz_words("en")
-      query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
-      search(query, true)
+    aget("/") do
+      get_buzz_words("en") do |buzz_words|
+        buzz_words ||= []
+        query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
+        body(search(query, true))
+        LOGGER.info("[web] GET /")
+      end
     end
 
     get("/search") do
       query = params[:q] || ""
-      search(query, false)
+      return search(query, false)
     end
     
 =begin
@@ -93,16 +99,24 @@ class TSSWebServer < Sinatra::Base
     end
 =end
     
-    get("/buzz") do
+    aget("/buzz") do
       result = []
-      for (lang_id, lang_name) in [["en", "English"], ["ja", "Japanese"]]
-        words = get_buzz_words(lang_id).grep(/^\#[a-zA-Z0-9_]+$/)[0, 10]
-        result.push({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
+      add_result = proc() do |lang_id, lang_name, &block|
+        get_buzz_words(lang_id) do |words|
+          words = (words || []).grep(/^\#[a-zA-Z0-9_]+$/)[0, 10]
+          result.push({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
+          block.call()
+        end
       end
-      content_type("text/javascript", :charset => "utf-8")
-      return JSON.dump(result)
+      add_result.call("en", "English") do
+        add_result.call("ja", "Japanese") do
+          content_type("text/javascript", :charset => "utf-8")
+          body(JSON.dump(result))
+          LOGGER.info("[web] GET /buzz")
+        end
+      end
     end
-
+    
 =begin
     get("/logout") do
       @session.clear()
@@ -143,12 +157,28 @@ class TSSWebServer < Sinatra::Base
       @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
       @title = params[:title]
       @logo_url = params[:logo]
-      erb(:search)
+      return erb(:search)
     end
     
-    def get_buzz_words(lang_id)
-      rss = RSS::Parser.parse(open("http://buzztter.com/#{lang_id}/rss"){ |f| f.read() })
-      return rss.items.map(){ |t| t.title }
+    def get_buzz_words(lang_id, &block)
+      http = EventMachine::HttpRequest.new("http://buzztter.com/#{lang_id}/rss").get()
+      http.callback() do
+        never_die() do
+          if http.response_header.status == 200
+            rss = RSS::Parser.parse(http.response)
+            yield(rss.items.map(){ |t| t.title })
+          else
+            LOGGER.error("[web] Buzztter fetch failed: status=%p" % http.response_header.status)
+            yield(nil)
+          end
+        end
+      end
+      http.errback() do
+        never_die() do
+          LOGGER.error("[web] Buzztter fetch failed: connection error")
+          yield(nil)
+        end
+      end
     end
     
 end
