@@ -4,11 +4,17 @@
 module TSSConfig
 
     # Register at http://dev.twitter.com/apps and put your keys below.
+    # The app must have read access. This key is used for Streaming API.
     # Last two are available from "My Access Token" link in your application page.
     TWITTER_API_KEY = "OAuth consumer key here"
     TWITTER_API_SECRET = "OAuth consumer secret here"
     TWITTER_API_ACCESS_TOKEN = "OAuth access token here"
     TWITTER_API_ACCESS_TOKEN_SECRET = "OAuth access token secret here"
+
+    # Keys for another app, which must have read/write access.
+    # This key is used to post users' tweets.
+    TWITTER_API_WRITE_KEY = "OAuth consumer key here"
+    TWITTER_API_WRITE_SECRET = "OAuth consumer secret here"
 
     # Change these for your environment. These ports must be available from public.
     BASE_URL = "http://tweet-search-stream.gimite.net"

@@ -33,7 +33,7 @@
     google.setOnLoadCallback(onLoad);
     
     WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf";
-    //WEB_SOCKET_DEBUG = true;
+    // WEB_SOCKET_DEBUG = true;
     FRAME_MSEC = 40;
     ANIMATION_MAX_DELAY_MSEC = 1000;
     PING_INTERVAL_MSEC = 5 * 60 * 1000;
@@ -44,7 +44,7 @@
     var entries = [];
     var displayQue = [];
     var showing = false;
-    var errorShown = false;
+    var streamErrorReported = false;
     
     function onLoad() {
       if (query) {
@@ -54,6 +54,8 @@
       showBuzz();
       $("#close-left-button").click(onCloseLeftButtonClick);
       $("#retry-link").click(onRetryLinkClick);
+      $("#show-update-link").click(onShowUpdateLinkClick);
+      $("#update-form").submit(onUpdateFormSubmit);
     }
     
     function onCloseLeftButtonClick() {
@@ -63,6 +65,34 @@
     function onRetryLinkClick(e) {
       e.preventDefault();
       location.reload();
+    }
+    
+    function onShowUpdateLinkClick(e) {
+      e.preventDefault();
+      $("#update").show();
+      focusOnUpdateField();
+    }
+    
+    function onUpdateFormSubmit(e) {
+      e.preventDefault();
+      var status = $("#update-field").val();
+      $("#update-field").val(" " + query);
+      focusOnUpdateField();
+      $("#update-progress").show();
+      console.log("update: " + status);
+      $.ajax({
+        type: "POST",
+        url: "/update",
+        data: {status: status},
+        success: function() {
+          console.log("update success");
+          $("#update-progress").hide();
+        },
+        error: function() {
+          $("#update-progress").hide();
+          showError("Error posting your tweet.", false);
+        }
+      });
     }
     
     function openWebSocket() {
@@ -117,6 +147,7 @@
         if (first) updateTweetsPerSec();
       } else {
         showError("Error: " + result.error);
+        streamErrorReported = true;
       }
     }
     
@@ -138,7 +169,7 @@
     
     function onWebSocketClosed() {
       console.log("ws.onclose or ws.onerror");
-      if (!errorShown) showError("Disconnected.", true);
+      if (!streamErrorReported) showError("Disconnected.", true);
       $("#result-message").hide();
     }
     
@@ -328,6 +359,13 @@
       return tps;
     }
     
+    function focusOnUpdateField() {
+      $("#update-field").focus();
+      // Moves the caret to the beginning. Doesn't work on IE.
+      $("#update-field").attr("selectionStart", 0);
+      $("#update-field").attr("selectionEnd", 0);
+    }
+    
     // Streaming API output has "urls" information but it looks Search API output doesn't.
     // So I use my hand-made pattern matching.
     function autoLink(str, elem) {
@@ -431,13 +469,12 @@
         $("#retry-link").hide();
       }
       $("#error-bar").show();
-      errorShown = true;
     }
     
   </script>
 </head><body>
   
-  <% if false %>
+  <% if @twitter %>
     <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
   <% end %>
   
@@ -469,8 +506,35 @@
   
   <% if !@query.empty? %>
     <div class="summary center-column">
-      Search result for <span class="query"><%=h @query %></span>
-      <span id="tps"></span>
+      
+      <div>
+        Search result for <span class="query"><%=h @query %></span>
+        <span id="tps"></span>
+        <% if @support_update %>
+          / <a href="#" id="show-update-link">Tweet here<img src="/images/bullet_arrow_down.png"></a>
+        <% end %>
+      </div>
+      
+      <% if @support_update %>
+        <div id="update" <% if !@show_update %>style="display: none;"<% end %>>
+          <% if @twitter %>
+            <form id="update-form">
+              <input type="text" id="update-field" value=" <%=h @query %>" size="60">
+              <input type="submit" value="Tweet">
+              <img id="update-progress" src="/images/ajax-loader.gif" style="display: none;">
+            </form>
+          <% else %>
+            <form action="/login" method="POST">
+              <div>You can tweet in this page if you sign in with Twitter account.</div>
+              <div>
+                <input type="hidden" name="redirect" value="<%=h @show_update_url %>">
+                <input type="image" src="/images/sign-in-with-twitter-d.png">
+              </div>
+            </form>
+          <% end %>
+        </div>
+      <% end %>
+      
     </div>
   <% end %>
   

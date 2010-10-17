@@ -32,23 +32,24 @@ class TSSWebServer < Sinatra::Base
     include(TSSHelper)
     include(ERB::Util)
     
+    HASH_TAG_EXP = /^\#[a-zA-Z0-9_]+$/
+    
     set(:port, TSSConfig::WEB_SERVER_PORT)
     set(:environment, TSSConfig::SINATRA_ENVIRONMENT)
     set(:public, "./public")
     set(:logging, true)
+    use(Rack::Session::Cookie, {
+      :key => TSSConfig::SESSION_COOKIE_KEY,
+      :path => "/",
+      :expire_after => 3 * 30 * 24 * 3600,
+      :secret => TSSConfig::TWITTER_API_WRITE_SECRET,
+    })
     register(Sinatra::Async)
     
-=begin
     before() do
-      session_id = request.cookies[TSSConfig::SESSION_COOKIE_KEY]
-      @session = session_id ? Session.get(session_id) : nil
-      @session ||= Session.new()
-      response.set_cookie(TSSConfig::SESSION_COOKIE_KEY,
-          {:value => @session.id, :path => "/", :expires => Time.now + 3 * 30 * 24 * 3600})
-      @twitter = get_twitter(@session[:access_token], @session[:access_token_secret])
+      @twitter = get_twitter(session[:access_token], session[:access_token_secret])
     end
-=end
-
+    
     aget("/") do
       get_buzz_words("en") do |buzz_words|
         buzz_words ||= []
@@ -63,20 +64,18 @@ class TSSWebServer < Sinatra::Base
       return search(query, false)
     end
     
-=begin
     post("/login") do
-      callback_url = "#{TSSConfig::BASE_URL}/oauth_callback?redirect=" + CGI.escape(params[:redirect] || "")
+      callback_url =
+        "#{TSSConfig::BASE_URL}/oauth_callback?redirect=" + CGI.escape(params[:redirect] || "")
       request_token = self.oauth_consumer.get_request_token(:oauth_callback => callback_url)
-      @session.data = {
-        :request_token => request_token.token,
-        :request_token_secret => request_token.secret,
-      }
+      session[:request_token] = request_token.token
+      session[:request_token_secret] = request_token.secret
       redirect(request_token.authorize_url)
     end
 
     get("/oauth_callback") do
       request_token = OAuth::RequestToken.new(
-        self.oauth_consumer, @session[:request_token], @session[:request_token_secret])
+        self.oauth_consumer, session[:request_token], session[:request_token_secret])
       begin
         @access_token = request_token.get_access_token(
           {},
@@ -86,24 +85,26 @@ class TSSWebServer < Sinatra::Base
         return erb %{ Authentication failed: <%=h @exception.message %> }
       end
       @twitter = get_twitter(@access_token.token, @access_token.secret)
-      @session.data = {
-        :access_token => @access_token.token,
-        :access_token_secret => @access_token.secret,
-        :screen_name => @twitter.verify_credentials().screen_name,
-      }
+      session[:access_token] = @access_token.token
+      session[:access_token_secret] = @access_token.secret
+      session[:screen_name] = @twitter.verify_credentials().screen_name
       if params[:redirect] && params[:redirect] =~ /\A\//
         redirect(params[:redirect])
       else
         redirect("/")
       end
     end
-=end
+    
+    post("/update") do
+      @twitter.update(params[:status])
+      return "ok"
+    end
     
     aget("/buzz") do
       result = []
       add_result = proc() do |lang_id, lang_name, &block|
         get_buzz_words(lang_id) do |words|
-          words = (words || []).grep(/^\#[a-zA-Z0-9_]+$/)[0, 10]
+          words = (words || []).grep(HASH_TAG_EXP)[0, 10]
           result.push({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
           block.call()
         end
@@ -117,12 +118,10 @@ class TSSWebServer < Sinatra::Base
       end
     end
     
-=begin
     get("/logout") do
-      @session.clear()
+      session.clear()
       redirect("/")
     end
-=end
     
     get("/css/default.css") do
       @webkit = request.user_agent =~ /AppleWebKit/
@@ -131,8 +130,9 @@ class TSSWebServer < Sinatra::Base
     end
 
     def get_twitter(access_token, access_token_secret)
-      if access_token
-        twitter_oauth = Twitter::OAuth.new(TSSConfig::TWITTER_API_KEY, TSSConfig::TWITTER_API_SECRET)
+      if access_token && access_token_secret
+        twitter_oauth = Twitter::OAuth.new(
+          TSSConfig::TWITTER_API_WRITE_KEY, TSSConfig::TWITTER_API_WRITE_SECRET)
         twitter_oauth.authorize_from_access(access_token, access_token_secret)
         return Twitter::Base.new(twitter_oauth)
       else
@@ -142,8 +142,8 @@ class TSSWebServer < Sinatra::Base
 
     def oauth_consumer
       return OAuth::Consumer.new(
-        TSSConfig::TWITTER_API_KEY,
-        TSSConfig::TWITTER_API_SECRET,
+        TSSConfig::TWITTER_API_WRITE_KEY,
+        TSSConfig::TWITTER_API_WRITE_SECRET,
         :site => "http://twitter.com")
     end
 
@@ -153,8 +153,15 @@ class TSSWebServer < Sinatra::Base
       @index = index
       @web_socket_url = "ws://%s:%d/" %
         [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
-#      @screen_name = @session[:screen_name]
+      @screen_name = session[:screen_name]
       @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
+      @support_update = @query =~ HASH_TAG_EXP
+      @show_update = params[:show_update]
+      if request.query_string.empty?
+        @show_update_url = "%s?show_update=true" % request.path
+      else
+        @show_update_url = "%s?%s&show_update=true" % [request.path, request.query_string]
+      end
       @title = params[:title]
       @logo_url = params[:logo]
       return erb(:search)
