@@ -21,10 +21,14 @@ require "twitter"
 require "sinatra/base"
 require "sinatra/async"
 require "em-http"
+require "http_accept_language"
 
 require "moji"
 require "tss_config"
 require "tss_helper"
+
+
+Sinatra::Request.send(:include, HttpAcceptLanguage)
 
 
 class TSSWebServer < Sinatra::Base
@@ -48,6 +52,11 @@ class TSSWebServer < Sinatra::Base
     
     before() do
       @twitter = get_twitter(session[:access_token], session[:access_token_secret])
+      @lang = params[:hl]
+      if !@lang && ["/", "/search"].include?(request.path)
+        @lang = request.compatible_language_from(["en", "ja"])
+        redirect(to_url(request, {"hl" => @lang}))
+      end
     end
     
     aget("/") do
@@ -82,7 +91,7 @@ class TSSWebServer < Sinatra::Base
           :oauth_token => params[:oauth_token],
           :oauth_verifier => params[:oauth_verifier])
       rescue OAuth::Unauthorized => @exception
-        return erb %{ Authentication failed: <%=h @exception.message %> }
+        return erubis(%{ Authentication failed: <%=h @exception.message %> })
       end
       @twitter = get_twitter(@access_token.token, @access_token.secret)
       session[:access_token] = @access_token.token
@@ -101,18 +110,17 @@ class TSSWebServer < Sinatra::Base
     end
     
     aget("/buzz") do
-      result = []
-      add_result = proc() do |lang_id, lang_name, &block|
+      get_result = proc() do |lang_id, lang_name, &block|
         get_buzz_words(lang_id) do |words|
           words = (words || []).grep(HASH_TAG_EXP)[0, 10]
-          result.push({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
-          block.call()
+          block.call({"lang_id" => lang_id, "lang_name" => lang_name, "words" => words})
         end
       end
-      add_result.call("en", "English") do
-        add_result.call("ja", "Japanese") do
+      get_result.call("en", "English") do |en_result|
+        get_result.call("ja", "Japanese") do |ja_result|
           content_type("text/javascript", :charset => "utf-8")
-          body(JSON.dump(result))
+          all_result = @lang == "ja" ? [ja_result, en_result] : [en_result, ja_result]
+          body(JSON.dump(all_result))
           LOGGER.info("[web] GET /buzz")
         end
       end
@@ -120,21 +128,23 @@ class TSSWebServer < Sinatra::Base
     
     get("/logout") do
       session.clear()
-      redirect("/")
+      redirect("/?hl=%s" % @lang)
     end
     
     get("/css/default.css") do
       @webkit = request.user_agent =~ /AppleWebKit/
       content_type("text/css")
-      erb(:"default.css")
+      erubis(:"default.css")
     end
 
     def get_twitter(access_token, access_token_secret)
       if access_token && access_token_secret
-        twitter_oauth = Twitter::OAuth.new(
-          TSSConfig::TWITTER_API_WRITE_KEY, TSSConfig::TWITTER_API_WRITE_SECRET)
-        twitter_oauth.authorize_from_access(access_token, access_token_secret)
-        return Twitter::Base.new(twitter_oauth)
+        return Twitter::Client.new({
+          :consumer_key => TSSConfig::TWITTER_API_WRITE_KEY,
+          :consumer_secret => TSSConfig::TWITTER_API_WRITE_SECRET,
+          :oauth_token => access_token,
+          :oauth_token_secret => access_token_secret,
+        })
       else
         return nil
       end
@@ -144,27 +154,29 @@ class TSSWebServer < Sinatra::Base
       return OAuth::Consumer.new(
         TSSConfig::TWITTER_API_WRITE_KEY,
         TSSConfig::TWITTER_API_WRITE_SECRET,
-        :site => "http://twitter.com")
+        :site => "http://twitter.com",
+        :request_endpoint => "http://api.twitter.com")
     end
 
     def search(query, index)
-      @query = query
-      @query_json = JSON.dump([@query])
+      @query = query.force_encoding(Encoding::UTF_8)
       @index = index
-      @web_socket_url = "ws://%s:%d/" %
+      web_socket_url = "ws://%s:%d/" %
         [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
       @screen_name = session[:screen_name]
-      @unsupported_query = @query =~ /#{Moji.kana}|#{Moji.kanji}/
       @support_update = @query =~ HASH_TAG_EXP
       @show_update = params[:show_update]
-      if request.query_string.empty?
-        @show_update_url = "%s?show_update=true" % request.path
-      else
-        @show_update_url = "%s?%s&show_update=true" % [request.path, request.query_string]
-      end
+      @show_update_url = to_url(request, {"show_update" => "true"})
+      @another_lang_url = to_url(request, {"hl" => @lang == "ja" ? "en" : "ja"})
       @title = params[:title]
       @logo_url = params[:logo]
-      return erb(:search)
+      @js_vars_json = JSON.dump({
+        "query" => @query,
+        "lang" => @lang,
+        "web_socket_url" => web_socket_url,
+      })
+      # Uses Erubis instead of ERB here because ERB causes encoding error for unknown reason.
+      return erubis(:search)
     end
     
     def get_buzz_words(lang_id, &block)
@@ -186,6 +198,13 @@ class TSSWebServer < Sinatra::Base
           yield(nil)
         end
       end
+    end
+    
+    def to_url(request, params)
+      return "%s?%s" % [
+        request.path,
+        request.params.merge(params).map(){ |k, v| CGI.escape(k) + "=" + CGI.escape(v) }.join("&"),
+      ]
     end
     
 end
