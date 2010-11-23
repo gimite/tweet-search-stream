@@ -9,10 +9,12 @@ $LOAD_PATH << "."
 $LOAD_PATH << "./lib"
 Thread.abort_on_exception = true
 
+require "rubygems"
+require "bundler/setup"
+
 require "logger"
 require "fileutils"
 
-require "rubygems"
 require "daemons"
 
 require "tss_web_server"

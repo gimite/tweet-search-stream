@@ -1,3 +1,4 @@
+<%# coding: UTF-8 %>
 <!DOCTYPE html>
 <!--
   Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
@@ -5,8 +6,13 @@
 -->
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta name="description" content="This is real time Twitter search using Twitter Streaming API.
-    New tweets are automatically shown in a few seconds after posting.">
+  <% if @lang == "ja" %>
+    <meta name="description" content="Twitter Streaming APIを使ったリアルタイムTwitter検索です。
+      新しいTweetが投稿されると、数秒で反映されます。">
+  <% else %>
+    <meta name="description" content="This is real time Twitter search using Twitter Streaming API.
+      New tweets are automatically shown in a few seconds after posting.">
+  <% end %>
   <% if @title %>
     <title><%=h @title %></title>
   <% elsif !@query.empty? && !@index %>
@@ -38,8 +44,51 @@
     ANIMATION_MAX_DELAY_MSEC = 1000;
     PING_INTERVAL_MSEC = 5 * 60 * 1000;
     
-    var query = <%= @query_json %>[0];
-    var web_socket_url = "<%= @web_socket_url %>";
+    <% if @lang == "ja" %>
+      var MESSAGES = {
+        tps: "Tweets/秒",
+        disconnected: "接続が切れました。",
+        postError: "Tweetを投稿できませんでした。",
+        error: "エラー",
+        noTweets: "Tweetが見つかりませんでした。",
+        aSecondAgo: "1秒前",
+        secondsAgo: "%d秒前",
+        lessThanSecondsAgo: "%d秒以内",
+        lessThanAMinuteAgo: "1分以内",
+        aMinuteAgo: "1分前",
+        minutesAgo: "%d分前",
+        anHourAgo: "1時間前",
+        hoursAgo: "%d時間前",
+        beforeSource: " ",
+        afterSource: "から",
+        retweetedBy: "%sがRetweet"
+      };
+    <% else %>
+      var MESSAGES = {
+        tps: "tweets/sec",
+        disconnected: "Disconnected.",
+        postError: "Error posting your tweet.",
+        error: "Error",
+        noTweets: "No tweets found.",
+        aSecondAgo: "1 second ago",
+        secondsAgo: "%d seconds ago",
+        lessThanSecondsAgo: "less than %d seconds ago",
+        lessThanAMinuteAgo: "less than 1 minute ago",
+        aMinuteAgo: "1 minute ago",
+        minutesAgo: "%d minutes ago",
+        anHourAgo: "1 hour ago",
+        hoursAgo: "%d hours ago",
+        beforeSource: " from ",
+        afterSource: "",
+        retweetedBy: "Retweeted by %s"
+      };
+    <% end %>
+    
+    var vars = <%= @js_vars_json %>;
+    var query = vars.query;
+    var webSocketUrl = vars.web_socket_url;
+    var lang = vars.lang;
+    
     var ws;
     var entries = [];
     var displayQue = [];
@@ -90,13 +139,13 @@
         },
         error: function() {
           $("#update-progress").hide();
-          showError("Error posting your tweet.", false);
+          showError(MESSAGES.postError, false);
         }
       });
     }
     
     function openWebSocket() {
-      var url = web_socket_url + "?q=" + encodeURIComponent(query);
+      var url = webSocketUrl + "?q=" + encodeURIComponent(query);
       console.log("openWebSocket", url);
       ws = new WebSocket(url);
       ws.onopen = onWebSocketOpen;
@@ -142,11 +191,11 @@
         if (result.entries.length > 0) {
           $("#result-message").hide();
         } else if (first) {
-          $("#result-message").text("No tweets found.");
+          $("#result-message").text(MESSAGES.noTweets);
         }
         if (first) updateTweetsPerSec();
       } else {
-        showError("Error: " + result.error);
+        showError(MESSAGES.error + ": " + result.error);
         streamErrorReported = true;
       }
     }
@@ -169,7 +218,7 @@
     
     function onWebSocketClosed() {
       console.log("ws.onclose or ws.onerror");
-      if (!streamErrorReported) showError("Disconnected.", true);
+      if (!streamErrorReported) showError(MESSAGES.disconnected, true);
       $("#result-message").hide();
     }
     
@@ -260,7 +309,7 @@
       var movedEntries = entries.slice(0, targetIndex);
       
       targetEntry.statusDiv.css("z-index", 1);
-      targetEntry.retweeterSpan.text("Retweeted by " + targetEntry.last_retweeter);
+      targetEntry.retweeterSpan.text(MESSAGES.retweetedBy.replace("%s", targetEntry.last_retweeter));
       
       entries.splice(targetIndex, 1);
       entries.splice(0, 0, targetEntry);
@@ -313,8 +362,9 @@
                 ["div",
                   ["a", {className: "entry-date", key: "dateAnchor", href: url, target: "_blank"},
                     getDateStr(entry)],
-                  " from ",
-                  ["span", {key: "sourceSpan"}]],
+                  MESSAGES.beforeSource,
+                  ["span", {key: "sourceSpan"}],
+                  MESSAGES.afterSource],
                 ["div",
                   ["span", {key: "retweeterSpan"}]]]],
             ["div", {className: "status-footer"}]]];
@@ -337,7 +387,7 @@
     function updateTweetsPerSec() {
       var tps = getTweetsPerSec();
       if (tps > 0) {
-        $("#tps").text("(" + tps.toFixed(3) + " tweets/sec)");
+        $("#tps").text("(" + tps.toFixed(2) + " " + MESSAGES.tps + ")");
       } else {
         $("#tps").empty();
       }
@@ -382,7 +432,7 @@
         var target;
         if (m[3]) {
           text = m[3];
-          url = "/search?q=" + encodeURIComponent(text);
+          url = "/search?q=" + encodeURIComponent(text) + "&hl=" + lang;
           target = "_self";
         } else if (m[4]) {
           text = m[4];
@@ -415,42 +465,42 @@
     function getDateStr(entry) {
       var secAgo = Math.floor((new Date().getTime() - entry.local_created_at) / 1000);
       if (secAgo == 1) {
-        return "1 second ago";
+        return MESSAGES.aSecondAgo;
       } else if (secAgo <= 5) {
-        return secAgo + " seconds ago";
+        return MESSAGES.secondsAgo.replace("%d", secAgo);
       } else if (secAgo < 10) {
-        return "less than 10 seconds ago";
+        return MESSAGES.lessThanSecondsAgo.replace("%d", 10);
       } else if (secAgo < 20) {
-        return "less than 20 seconds ago";
+        return MESSAGES.lessThanSecondsAgo.replace("%d", 20);
       } else if (secAgo < 30) {
-        return "less than 30 seconds ago";
+        return MESSAGES.lessThanSecondsAgo.replace("%d", 30);
       } else if (secAgo < 60) {
-        return "less than 1 minute ago";
+        return MESSAGES.lessThanAMinuteAgo;
       } else if (secAgo < 120) {
-        return "1 minute ago";
+        return MESSAGES.aMinuteAgo;
       } else if (secAgo < 3600) {
-        return Math.ceil(secAgo / 60) + " minutes ago";
+        return MESSAGES.minutesAgo.replace("%d", Math.ceil(secAgo / 60));
       } else if (secAgo < 3600 * 2) {
-        return "1 hour ago";
+        return MESSAGES.anHourAgo;
       } else {
-        return Math.ceil(secAgo / 3600) + " hours ago";
+        return MESSAGES.hoursAgo.replace("%d", Math.ceil(secAgo / 3600));
       }
-      return secAgo == 1 ? "1 second ago" : secAgo + " seconds ago";
     }
     
     function showBuzz() {
       $.ajax({
-        url: "/buzz",
+        url: "/buzz?hl=" + lang,
         dataType: "json",
         success: function(result) {
           $("#buzz").empty();
           for (var i = 0; i < result.length; ++i) {
             for (var j = 0; j < result[i].words.length; ++j) {
               var word = result[i].words[j];
+              var url = "/search?q=" + encodeURIComponent(word) + "&hl=" + lang;
               $("#buzz").append(createElementTree(
                 ["div",
                   ["img", {className: "buzz-icon", src: "/images/" + result[i].lang_id + ".png"}],
-                  ["a", {href: "/search?q=" + encodeURIComponent(word)}, word]]));
+                  ["a", {href: url}, word]]));
             }
           }
         },
@@ -474,15 +524,31 @@
   </script>
 </head><body>
   
-  <% if @twitter %>
-    <div class="header">@<%=h @screen_name %> <a href="/logout">Log out</a></div>
-  <% end %>
+  <div class="header">
+    <% if @twitter %>
+      @<%=h @screen_name %>
+      <a href="/logout?hl=<%=h @lang %>">
+        <% if @lang == "ja" %>
+          ログアウト
+        <% else %>
+          Log out
+        <% end %>
+      </a>
+    <% end %>
+    <a href="<%=h @another_lang_url %>">
+      <% if @lang == "ja" %>
+        English
+      <% else %>
+        Japanese
+      <% end %>
+    </a>
+  </div>
   
   <h1 class="center-column">
     <% if @logo_url %>
       <img class="logo" src="<%=h @logo_url %>">
     <% end %>
-    <a class="title" href="/">
+    <a class="title" href="/?hl=<%=h @lang %>">
       <% if @title %>
         <%=h @title %>
       <% else %>
@@ -494,13 +560,19 @@
   <form class="query-form center-column" action="/search" method="GET">
     <% if @index %>
       <p>
-        This is real time Twitter search using Twitter Streaming API.
-        New tweets are automatically shown in a few seconds after posting.
+        <% if @lang == "ja" %>
+          Twitter Streaming APIを使ったリアルタイムTwitter検索です。
+          新しいTweetが投稿されると、数秒で反映されます。
+        <% else %>
+          This is real time Twitter search using Twitter Streaming API.
+          New tweets are automatically shown in a few seconds after posting.
+        <% end %>
       </p>
     <% end %>
     <div>
       <input type="text" id="query-field" name="q" value="<%=h @query %>" size="30">
-      <input type="submit" value="Search">
+      <input type="hidden" name="hl" value="<%=h @lang %>">
+      <input type="submit" value="<%=h(@lang == "ja" ? "検索" : "Search")%>">
     </div>
   </form>
   
@@ -508,10 +580,18 @@
     <div class="summary center-column">
       
       <div>
-        Search result for <span class="query"><%=h @query %></span>
+        <% if @lang == "ja" %>
+          <span class="query"><%=h @query %></span> の検索結果
+        <% else %>
+          Search result for <span class="query"><%=h @query %></span>
+        <% end %>
         <span id="tps"></span>
         <% if @support_update %>
-          / <a href="#" id="show-update-link">Tweet here<img src="/images/bullet_arrow_down.png"></a>
+          /
+          <a href="#" id="show-update-link">
+            <% if @lang == "ja" %>Tweetする<% else %>Tweet here<% end %><!--
+            --><img src="/images/bullet_arrow_down.png">
+          </a>
         <% end %>
       </div>
       
@@ -525,7 +605,13 @@
             </form>
           <% else %>
             <form action="/login" method="POST">
-              <div>You can tweet in this page if you sign in with Twitter account.</div>
+              <div>
+                <% if @lang == "ja" %>
+                  Twitterアカウントでログインすると、ここからTweetできます。
+                <% else %>
+                  You can tweet in this page if you sign in with Twitter account.
+                <% end %>
+              </div>
               <div>
                 <input type="hidden" name="redirect" value="<%=h @show_update_url %>">
                 <input type="image" src="/images/sign-in-with-twitter-d.png">
@@ -542,7 +628,13 @@
     
     <div id="left-column" class="left-column">
       <div class="buzz-nav"><img id="close-left-button" src="/images/cross.png" title="Hide hot words"></div>
-      <div class="buzz-title">Hot hash tags</div>
+      <div class="buzz-title">
+        <% if @lang == "ja" %>
+          話題のハッシュタグ
+        <% else %>
+          Hot hash tags
+        <% end %>
+      </div>
       <div id="buzz" class="buzz">Loading...</div>
       <div class="buzz-footer">
         <div>Powered by <a href="http://buzztter.com/" target="_blank">buzztter</a></div>
@@ -554,16 +646,15 @@
       
       <div id="error-bar" class="error center-column" style="display: none;">
         <span id="error-message"></span>
-        <a href="#" id="retry-link">Retry</a>
+        <a href="#" id="retry-link">
+          <% if @lang == "ja" %>
+            再接続
+          <% else %>
+            Retry
+          <% end %>
+        </a>
       </div>
       
-      <% if @unsupported_query %>
-        <div class="error center-column">
-          Auto-reloading doesn't work for most of Japanese/Chinese keywords
-          due to Twitter API limitation.
-        </div>
-      <% end %>
-        
       <div class="result-container">
         <div id="result" class="result">
           <div id="result-message" class="result-message">Loading...</div>
