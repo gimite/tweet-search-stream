@@ -9,17 +9,11 @@ require "time"
 conns = 0
 time = nil
 File.foreach("log/tss_server.output") do |line|
-  if line =~ /^I, \[(\S+)/
-    time = Time.parse($1)
-  end
-  if line =~ /Connection accepted: (-?\d+)/
-    conns += 1
-    p [time, conns]
-  elsif line =~ /Connection closed: (-?\d+)/
-    conns -= 1
-    p [time, conns]
-  elsif line =~ /WebSocket Server is running/
-    conns = 0
-    p [time, conns]
+  if line =~ /^I, \[(\S+) \S+\]  INFO -- : \[websock\] connections=(.*)$/
+    time = $1
+    conns = eval($2)
+    total = conns.inject(0){ |r, (a, b)| r + b }
+    max = conns.max_by(){ |a, b| b }
+    p [time, total, max]
   end
 end
