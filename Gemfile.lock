@@ -1,0 +1,47 @@
+GEM
+  remote: http://rubygems.org/
+  specs:
+    addressable (2.2.1)
+    async_sinatra (0.3.0)
+      sinatra (>= 1.0)
+    crack (0.1.6)
+    daemons (1.1.0)
+    em-http-request (0.2.14)
+      addressable (>= 2.0.0)
+      eventmachine (>= 0.12.9)
+    em-websocket (0.1.4.1)
+      addressable (>= 2.1.1)
+      eventmachine (>= 0.12.9)
+    eventmachine (0.12.10)
+    hashie (0.2.2)
+    httparty (0.5.2)
+      crack (= 0.1.6)
+    moji (1.5)
+    oauth (0.4.3)
+    rack (1.2.1)
+    sinatra (1.0)
+      rack (>= 1.0)
+    thin (1.2.7)
+      daemons (>= 1.0.9)
+      eventmachine (>= 0.12.6)
+      rack (>= 1.0.0)
+    twitter (0.9.8)
+      hashie (~> 0.2.0)
+      httparty (~> 0.5.0)
+      oauth (~> 0.4.1)
+      yajl-ruby (~> 0.7.0)
+    yajl-ruby (0.7.7)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  async_sinatra
+  daemons
+  em-http-request
+  em-websocket
+  moji
+  oauth
+  sinatra
+  thin
+  twitter
