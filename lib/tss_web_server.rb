@@ -54,7 +54,7 @@ class TSSWebServer < Sinatra::Base
       @twitter = get_twitter(session[:access_token], session[:access_token_secret])
       @lang = params[:hl]
       if !@lang && ["/", "/search"].include?(request.path)
-        @lang = request.compatible_language_from(["en", "ja"])
+        @lang = request.compatible_language_from(["en", "ja"]) || "en"
         # If we omit TSSConfig::BASE_URL here, it redirects to
         # http://tweet-search-stream.gimite.net:12011/?hl=ja
         # where 12011 is internal port number, for unknown reason.
