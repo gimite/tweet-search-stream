@@ -158,8 +158,7 @@ class TSSWebServer < Sinatra::Base
       return OAuth::Consumer.new(
         TSSConfig::TWITTER_API_WRITE_KEY,
         TSSConfig::TWITTER_API_WRITE_SECRET,
-        :site => "http://twitter.com",
-        :request_endpoint => "http://api.twitter.com")
+        :site => "http://twitter.com")
     end
 
     def search(query, index)
