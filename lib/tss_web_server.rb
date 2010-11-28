@@ -55,9 +55,6 @@ class TSSWebServer < Sinatra::Base
       @lang = params[:hl]
       if !@lang && ["/", "/search"].include?(request.path)
         @lang = request.compatible_language_from(["en", "ja"]) || "en"
-        # If we omit TSSConfig::BASE_URL here, it redirects to
-        # http://tweet-search-stream.gimite.net:12011/?hl=ja
-        # where 12011 is internal port number, for unknown reason.
         redirect(TSSConfig::BASE_URL + to_url(request, {"hl" => @lang}))
       end
     end
@@ -102,9 +99,9 @@ class TSSWebServer < Sinatra::Base
       session[:access_token_secret] = @access_token.secret
       session[:screen_name] = @twitter.verify_credentials().screen_name
       if params[:redirect] && params[:redirect] =~ /\A\//
-        redirect(params[:redirect])
+        redirect(TSSConfig::BASE_URL + params[:redirect])
       else
-        redirect("/")
+        redirect(TSSConfig::BASE_URL + "/")
       end
     end
     
@@ -132,7 +129,7 @@ class TSSWebServer < Sinatra::Base
     
     get("/logout") do
       session.clear()
-      redirect("/?hl=%s" % @lang)
+      redirect("%s/?hl=%s" % [TSSConfig::BASE_URL, @lang])
     end
     
     get("/css/default.css") do
