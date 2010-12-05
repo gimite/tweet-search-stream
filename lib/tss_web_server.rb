@@ -20,6 +20,7 @@ require "oauth"
 require "twitter"
 require "sinatra/base"
 require "sinatra/async"
+require "sinatra/reloader"
 require "em-http"
 require "http_accept_language"
 
@@ -46,9 +47,13 @@ class TSSWebServer < Sinatra::Base
       :key => TSSConfig::SESSION_COOKIE_KEY,
       :path => "/",
       :expire_after => 3 * 30 * 24 * 3600,
+      # Reuses Twitter key. Anything secret is fine.
       :secret => TSSConfig::TWITTER_API_WRITE_SECRET,
     })
     register(Sinatra::Async)
+    configure(:development) do
+      register(Sinatra::Reloader)
+    end
     
     before() do
       @twitter = get_twitter(session[:access_token], session[:access_token_secret])

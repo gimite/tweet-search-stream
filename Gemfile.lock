@@ -5,6 +5,7 @@ GEM
     addressable (2.2.2)
     async_sinatra (0.3.0)
       sinatra (>= 1.0)
+    backports (1.18.2)
     daemons (1.1.0)
     em-http-request (0.2.15)
       addressable (>= 2.0.0)
@@ -24,6 +25,8 @@ GEM
     hashie (0.4.0)
     http_accept_language (1.0.1)
     moji (1.5)
+    monkey-lib (0.5.4)
+      backports
     multi_json (0.0.5)
     multi_xml (0.2.0)
     multipart-post (1.0.1)
@@ -33,6 +36,16 @@ GEM
     sinatra (1.1.0)
       rack (~> 1.1)
       tilt (~> 1.1)
+    sinatra-advanced-routes (0.5.1)
+      monkey-lib (~> 0.5.0)
+      sinatra (~> 1.0)
+      sinatra-sugar (~> 0.5.0)
+    sinatra-reloader (0.5.0)
+      sinatra (~> 1.0)
+      sinatra-advanced-routes (~> 0.5.0)
+    sinatra-sugar (0.5.0)
+      monkey-lib (~> 0.5.0)
+      sinatra (~> 1.0)
     thin (1.2.7)
       daemons (>= 1.0.9)
       eventmachine (>= 0.12.6)
@@ -59,5 +72,6 @@ DEPENDENCIES
   moji
   oauth
   sinatra
+  sinatra-reloader
   thin
   twitter
