@@ -208,7 +208,8 @@ class TSSWebServer < Sinatra::Base
     def to_url(request, params)
       return "%s?%s" % [
         request.path,
-        request.params.merge(params).map(){ |k, v| CGI.escape(k) + "=" + CGI.escape(v) }.join("&"),
+        request.params.merge(params).
+          map(){ |k, v| CGI.escape(k) + "=" + CGI.escape(v || "") }.join("&"),
       ]
     end
     
