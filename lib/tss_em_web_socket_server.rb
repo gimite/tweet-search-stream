@@ -187,15 +187,18 @@ class TSSEMWebSocketServer
           end
         end,
         :on_entry => proc() do |json|
-          if json =~ /"text":"(([^"\\]|\\.)*)"/
-            text = $1.downcase
-            json.slice!(json.length - 1, 1)  # Deletes last '}'
-            data = '{"entries": [%s,"now":%f}]}' % [json, Time.now.to_f()]
-            for query, wsocks in @query_to_wsocks
-              if text.index(query)
-                for wsock in wsocks
-                  wsock.send(data)
-                end
+          # For efficiency, avoids parsing and redumping JSON.
+          # Instead, uses regexp to extract Tweet text to match search query, and uses string
+          # manipulation to add additional field "now".
+          # There may be more than one "text" in different level and it's hard to find real one,
+          # so joins values of all "text" field.
+          text = json.scan(/"text":"(([^"\\]|\\.)*)"/).map(){ |a, b| a }.join(" ").downcase
+          json.slice!(json.length - 1, 1)  # Deletes last '}'
+          data = '{"entries": [%s,"now":%f}]}' % [json, Time.now.to_f()]
+          for query, wsocks in @query_to_wsocks
+            if text.index(query)
+              for wsock in wsocks
+                wsock.send(data)
               end
             end
           end

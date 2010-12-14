@@ -47,6 +47,36 @@ img {
   margin-right: 100px;
 }
 
+.ustream-left-column {
+  float: left;
+  width: 480px;
+  overflow: hidden;
+}
+
+.ustream-right-column {
+  margin-left: 500px;
+  margin-right: 100px;
+}
+
+.video-container {
+  overflow: hidden;
+  z-index: 1;
+}
+
+.overlay-container {
+  position: absolute;
+  overflow: hidden;
+}
+
+.overlay {
+  position: absolute;
+  font-size: 120%;
+  font-weight: bold;
+  color: gray;
+  white-space: nowrap;
+  z-index: 2;
+}
+
 .buzz-nav {
   float: right;
 }

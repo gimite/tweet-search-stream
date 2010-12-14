@@ -21,7 +21,6 @@ require "tss_web_server"
 require "tss_em_web_socket_server"
 
 
-#WebSocket.debug = true
 root_dir = File.dirname(File.expand_path(__FILE__))
 
 opts = {

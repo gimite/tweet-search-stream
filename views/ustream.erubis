@@ -32,8 +32,50 @@
     
     google.setOnLoadCallback(onLoad);
     
+    var overlays = [];
+    var nextOverlayTop = 0;
+    
     function onLoad() {
       initialize();
+      addOnEntries(handleEntriesForOverlay);
+      var videoPos = $("#place-holder").position();
+      var videoWidth = $("#place-holder").width();
+      var videoHeight = $("#place-holder").height();
+      $("#video-container").css("left", videoPos.left);
+      $("#video-container").css("top", videoPos.top);
+      $("#video-container").css("width", videoWidth);
+      $("#video-container").css("height", videoHeight);
+      
+      setInterval(onOverlayTimer, 50);
+    }
+    
+    function handleEntriesForOverlay(newEntries, history) {
+      if (history) return;
+      var videoWidth = $("#video-container").width();
+      var videoHeight = $("#video-container").height();
+      for (var i = 0; i < newEntries.length; ++i) {
+        var entry = newEntries[i];
+        if (!entry.retweeted_status) {
+          //console.log(entry.unescaped_text);
+          var text = entry.unescaped_text.replace(/ \( #\S+ live at \S+\)/, "");
+          var overlay = createElementTree(["span", {className: "overlay"}, text]);
+          overlay.css("left", videoWidth + "px");
+          overlay.css("top", nextOverlayTop + "px");
+          $("#video-container").append(overlay);
+          overlays.push(overlay);
+          console.log(overlay.height());
+          nextOverlayTop += overlay.height();
+          if (nextOverlayTop + overlay.height() > videoHeight) {
+            nextOverlayTop = 0;
+          }
+        }
+      }
+    }
+    
+    function onOverlayTimer() {
+      for (var i = 0; i < overlays.length; ++i) {
+        overlays[i].css("left", (overlays[i].position().left - 10) + "px");
+      }
     }
     
   </script>
@@ -59,7 +101,7 @@
     </a>
   </div>
   
-  <h1 class="center-column">
+  <h1 class="ustream-right-column">
     <% if @logo_url %>
       <img class="logo" src="<%=h @logo_url %>">
     <% end %>
@@ -68,7 +110,7 @@
     </a>
   </h1>
   
-  <form class="query-form center-column" action="/search" method="GET">
+  <form class="query-form ustream-right-column" action="/search" method="GET">
     <% if @index %>
       <p>
         <% if @lang == "ja" %>
@@ -88,7 +130,7 @@
   </form>
   
   <% if !@query.empty? %>
-    <div class="summary center-column">
+    <div class="summary ustream-right-column">
       
       <div>
         <% if @lang == "ja" %>
@@ -137,25 +179,13 @@
   
   <div class="container">
     
-    <div id="left-column" class="left-column">
-      <div class="buzz-nav"><img id="close-left-button" src="/images/cross.png" title="Hide hot words"></div>
-      <div class="buzz-title">
-        <% if @lang == "ja" %>
-          話題のハッシュタグ
-        <% else %>
-          Hot hash tags
-        <% end %>
-      </div>
-      <div id="buzz" class="buzz">Loading...</div>
-      <div class="buzz-footer">
-        <div>Powered by <a href="http://buzztter.com/" target="_blank">buzztter</a></div>
-        <div>Icon by <a href="http://www.famfamfam.com/" target="_blank">famfamfam.com</a></div>
-      </div>
+    <div class="ustream-left-column">
+      <div id="place-holder" style="width: 480px; height: 296px;"></div>
     </div>
     
     <% if !@query.empty? %>
       
-      <div id="error-bar" class="error center-column" style="display: none;">
+      <div id="error-bar" class="error ustream-right-column" style="display: none;">
         <span id="error-message"></span>
         <a href="#" id="retry-link">
           <% if @lang == "ja" %>
@@ -179,6 +209,22 @@
   <div class="footer">
     Created by <a href="http://gimite.net/en/" target="_blank">Gimite</a> /
     <a href="http://github.com/gimite/tweet-search-stream" target="_blank">Source code</a>
+  </div>
+  
+  <!-- This is position: absolute to make overflow: hidden take effect for overlays. -->
+  <div id="video-container" class="video-container" style="position: absolute;">
+    <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000" width="480" height="296" id="video">
+      <param name="flashvars"
+        value="autoplay=true&amp;brand=embed&amp;cid=<%=h @channel_id %>&amp;locale=ja_JP&amp;v3=1"/>
+      <param name="allowfullscreen" value="true"/>
+      <param name="allowscriptaccess" value="always"/>
+      <param name="movie" value="http://www.ustream.tv/flash/viewer.swf"/>
+      <embed
+        flashvars="autoplay=true&amp;brand=embed&amp;cid=<%=h @channel_id %>&amp;locale=ja_JP&amp;v3=1"
+        width="480" height="296" allowfullscreen="true" allowscriptaccess="always" id="utv196870"
+        name="utv_n_974717" src="http://www.ustream.tv/flash/viewer.swf"
+        type="application/x-shockwave-flash" wmode="transparent" />
+    </object>
   </div>
   
 </body></html>

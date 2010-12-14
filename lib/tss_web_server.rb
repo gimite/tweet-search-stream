@@ -58,7 +58,7 @@ class TSSWebServer < Sinatra::Base
     before() do
       @twitter = get_twitter(session[:access_token], session[:access_token_secret])
       @lang = params[:hl]
-      if !@lang && ["/", "/search"].include?(request.path)
+      if !@lang && ["/", "/search", "/js/search.js"].include?(request.path)
         @lang = request.compatible_language_from(["en", "ja"]) || "en"
         redirect(TSSConfig::BASE_URL + to_url(request, {"hl" => @lang}))
       end
@@ -69,14 +69,23 @@ class TSSWebServer < Sinatra::Base
         buzz_words ||= []
         query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
         content_type("text/html", :charset => "utf-8")
-        body(search(query, true))
+        body(search(query, :search, true))
         LOGGER.info("[web] GET /")
       end
     end
 
     get("/search") do
       query = params[:q] || ""
-      return search(query, false)
+      return search(query, :search, false)
+    end
+    
+    get("/ustream") do
+      channel = params[:channel]
+      info = JSON.load(
+        open("http://api.ustream.tv/json/channel/%s/getInfo" % CGI.escape(channel)){ |f| f.read() })
+      @channel_id = info["results"]["id"]
+      query = info["results"]["socialStream"]["hashtag"]
+      return search(query, :ustream, false)
     end
     
     post("/login") do
@@ -143,6 +152,11 @@ class TSSWebServer < Sinatra::Base
       erubis(:"default.css")
     end
 
+    get("/js/search.js") do
+      content_type("text/javascript")
+      erubis(:"search.js")
+    end
+
     def get_twitter(access_token, access_token_secret)
       if access_token && access_token_secret
         return Twitter::Client.new({
@@ -163,7 +177,8 @@ class TSSWebServer < Sinatra::Base
         :site => "http://twitter.com")
     end
 
-    def search(query, index)
+    def search(query, template, index)
+      
       @query = query.force_encoding(Encoding::UTF_8)
       @index = index
       web_socket_url = "ws://%s:%d/" %
@@ -173,15 +188,24 @@ class TSSWebServer < Sinatra::Base
       @show_update = params[:show_update]
       @show_update_url = to_url(request, {"show_update" => "true"})
       @another_lang_url = to_url(request, {"hl" => @lang == "ja" ? "en" : "ja"})
-      @title = params[:title]
+      
+      if params[:title]
+        @head_title = @body_title = params[:title]
+      elsif !@query.empty? && !index
+        @head_title = "%s - Tweet Search Stream" % @query
+        @body_title = "Tweet Search Stream"
+      else
+        @head_title = @body_title = "Tweet Search Stream"
+      end
       @logo_url = params[:logo]
+      
       @js_vars_json = JSON.dump({
         "query" => @query,
         "lang" => @lang,
         "web_socket_url" => web_socket_url,
       })
-      # Uses Erubis instead of ERB here because ERB causes encoding error for unknown reason.
-      return erubis(:search)
+      return erubis(template)
+      
     end
     
     def get_buzz_words(lang_id, &block)
