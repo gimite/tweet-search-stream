@@ -187,8 +187,15 @@ function convertEntry(entry, history) {
   var remoteCreatedAt = new Date(entry.created_at.replace(/\+0000/, "UTC"));
   var remoteNow = new Date(entry.now * 1000);
   var localNow = new Date();
+  // local_created_at:
+  //   The time when the entry was posted. Used to show the time posted.
+  // local_updated_at:
+  //   The time when the entry was received by the client (unless it's in the history),
+  //   or retweet of the entry was received.
+  //   Tweet/sec is calculated with this, to make calculation a bit more accurate, and
+  //   to make sure the entries in displayQue and entries are sorted by the field.
   entry.local_created_at = localNow.getTime() - (remoteNow - remoteCreatedAt);
-  entry.local_received_at = history ? entry.local_created_at : localNow.getTime();
+  entry.local_updated_at = history ? entry.local_created_at : localNow.getTime();
   if (entry.retweeted_status) {
     entry.retweeted_status.now = entry.now;
     convertEntry(entry.retweeted_status);
@@ -202,21 +209,21 @@ function onWebSocketClosed() {
 }
 
 function queryShowEntry(entry) {
-  
   //console.log("queryShowEntry", entry);
+  displayQue.push(entry);
+  updateAnimationSpeed();
+  if (!showing) showEntryInQueue();
+}
+
+function updateAnimationSpeed() {
   // Modifies animation speed so that the new entry is displayed in ANIMATION_MAX_DELAY_MSEC
   // from now.
-  var animation_msec = ANIMATION_MAX_DELAY_MSEC / (displayQue.length + 1);
+  var animationMsec = ANIMATION_MAX_DELAY_MSEC / (displayQue.length);
   for (var i = 0; i < displayQue.length; ++i) {
-    if (displayQue[i].animation_msec > animation_msec) {
-      displayQue[i].animation_msec = animation_msec;
+    if (!displayQue[i].animation_msec || displayQue[i].animation_msec > animationMsec) {
+      displayQue[i].animation_msec = animationMsec;
     }
   }
-  entry.animation_msec = animation_msec;
-  
-  displayQue.push(entry);
-  if (!showing) showEntryInQueue();
-  
 }
 
 function showEntryInQueue() {
@@ -231,7 +238,15 @@ function showEntryInQueue() {
     return;
   }
   showing = true;
+  var numSkipped = 0;
+  if (displayQue.length > 50) {
+    // Too many entries in the queue. Likely more entries are coming than processed.
+    numSkipped = displayQue.length - 50;
+    console.log("skip", numSkipped);
+    displayQue.splice(0, numSkipped);
+  }
   var entry = displayQue[0];
+  entry.num_skipped = numSkipped;
   displayQue.splice(0, 1);
   
   if (entry.retweeted_status) {
@@ -245,8 +260,10 @@ function showEntryInQueue() {
     if (!retweetedEntry) {
       retweetedEntry = entry.retweeted_status;
     }
+    retweetedEntry.local_updated_at = entry.local_updated_at;
     retweetedEntry.last_retweeter = entry.user.screen_name;
     retweetedEntry.animation_msec = entry.animation_msec;
+    retweetedEntry.num_skipped = entry.num_skipped;
     raiseEntry(retweetedEntry);
   } else {
     prependEntry(entry);
@@ -375,14 +392,13 @@ function updateTweetsPerSec() {
 function getTweetsPerSec() {
   var allEntries = displayQue.concat(entries);
   var localNow = new Date().getTime();
-  var oldestReceivedAt = localNow;
+  var oldestUpdatedAt = localNow;
   var numTweets = 0;
   for (var i = 0; i < allEntries.length; ++i) {
-    if (allEntries[i].retweeted_status || allEntries[i].last_retweeter) continue;
-    ++numTweets;
-    oldestReceivedAt = allEntries[i].local_received_at;
+    numTweets += 1 + (allEntries[i].num_skipped || 0);
+    oldestUpdatedAt = allEntries[i].local_updated_at;
   }
-  var durationSec = (localNow - oldestReceivedAt) / 1000;
+  var durationSec = (localNow - oldestUpdatedAt) / 1000;
   var tps = durationSec == 0 ? 0 : numTweets / durationSec;
   //console.log("tps", tps, numTweets, durationSec);
   return tps;
