@@ -59,6 +59,7 @@ var displayQue = [];
 var showing = false;
 var streamErrorReported = false;
 var onEntriesCallbacks = [];
+var leftClosed = false;
 
 function initialize() {
   if (query) {
@@ -66,6 +67,8 @@ function initialize() {
     startClockTimer();
   }
   showBuzz();
+  onWindowResize();
+  $(window).resize(onWindowResize);
   $("#close-left-button").click(onCloseLeftButtonClick);
   $("#retry-link").click(onRetryLinkClick);
   $("#show-update-link").click(onShowUpdateLinkClick);
@@ -73,8 +76,25 @@ function initialize() {
   addOnEntries(onEntries);
 }
 
+function onWindowResize() {
+  if (!leftClosed) setLeftColumnVisible($("body").width() >= 600);
+}
+
 function onCloseLeftButtonClick() {
-  $("#left-column").css("visibility", "hidden");
+  leftClosed = true;
+  setLeftColumnVisible(false);
+}
+
+function setLeftColumnVisible(visible) {
+  if (visible) {
+    $("#left-column").show();
+    $(".center-column").removeClass("left-hidden");
+    $(".result-container").removeClass("left-hidden");
+  } else {
+    $("#left-column").hide();
+    $(".center-column").addClass("left-hidden");
+    $(".result-container").addClass("left-hidden");
+  }
 }
 
 function onRetryLinkClick(e) {

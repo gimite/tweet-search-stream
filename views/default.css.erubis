@@ -23,6 +23,13 @@ img {
   border: 0px;
 }
 
+.page {
+  max-width: 700px;
+  /* centering */
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .header {
   float: right;
   font-size: 80%;
@@ -44,7 +51,12 @@ img {
 
 .center-column {
   margin-left: 170px;
-  margin-right: 100px;
+  margin-right: 0px;
+}
+
+.center-column.left-hidden {
+  margin-left: 0px;
+  margin-right: 0px;
 }
 
 .ustream-left-column {
@@ -112,15 +124,20 @@ img {
 .result-container {
   margin-left: 170px;
   <% if @webkit %>
-    /* I'm not sure what's happening but this makes actual margin 100px in Chrome, probably
+    /* I'm not sure what's happening but this makes actual margin 0px in Chrome, probably
        because of existence of left-column. */
-    margin-right: -50px;
+    margin-right: -150px;
   <% else %>
-    margin-right: 100px;
+    margin-right: 0px;
   <% end %>
   margin-top: 8px;
   border-top: 1px solid silver;
   overflow: hidden;
+}
+
+.result-container.left-hidden {
+  margin-left: 0px;
+  margin-right: 0px;
 }
 
 .result {
@@ -188,8 +205,8 @@ img {
 }
 
 .single-column {
-  margin-left: 100px;
-  margin-right: 100px;
+  margin-left: 0px;
+  margin-right: 0px;
 }
 
 .login-button {

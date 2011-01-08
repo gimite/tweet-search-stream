@@ -5,27 +5,33 @@
 -->
 <html><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <link href="/css/default.css" rel="stylesheet" type="text/css">
+  <!-- For Android/iOS -->
+  <meta name="viewport" content="width=device-width">
   <title>Tweet Search Stream</title>
+  <link href="/css/default.css" rel="stylesheet" type="text/css">
 </head><body>
   
-  <h1 class="single-column">Tweet Search Stream</h1>
+  <div class="page">
   
-  <div class="single-column">
-    <p>
-      This is real time Twitter search using Twitter Streaming API.
-      New tweets are automatically shown in a few seconds after posting.
-    </p>
-    <p>Sign in with Twitter to use this service.</p>
-    <form action="/login" method="POST">
-      <input type="hidden" name="redirect" value="<%=h @current_url %>">
-      <input type="image" src="/images/sign-in-with-twitter-d.png">
-    </form>
-  </div>
+    <h1 class="single-column">Tweet Search Stream</h1>
+    
+    <div class="single-column">
+      <p>
+        This is real time Twitter search using Twitter Streaming API.
+        New tweets are automatically shown in a few seconds after posting.
+      </p>
+      <p>Sign in with Twitter to use this service.</p>
+      <form action="/login" method="POST">
+        <input type="hidden" name="redirect" value="<%=h @current_url %>">
+        <input type="image" src="/images/sign-in-with-twitter-d.png">
+      </form>
+    </div>
+    
+    <div class="footer">
+      Created by <a href="http://gimite.net/en/" target="_blank">Gimite</a> /
+      <a href="http://github.com/gimite/tweet-search-stream" target="_blank">Source code</a>
+    </div>
   
-  <div class="footer">
-    Created by <a href="http://gimite.net/en/" target="_blank">Gimite</a> /
-    <a href="http://github.com/gimite/tweet-search-stream" target="_blank">Source code</a>
   </div>
   
 </body></html>
