@@ -8,7 +8,7 @@ require "time"
 
 conns = 0
 time = nil
-File.foreach("log/tss_server.output") do |line|
+ARGF.each_line() do |line|
   if line =~ /^I, \[(\S+) \S+\]  INFO -- : \[websock\] connections=(.*)$/
     time = $1
     conns = eval($2)

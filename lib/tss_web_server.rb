@@ -67,7 +67,7 @@ class TSSWebServer < Sinatra::Base
     aget("/") do
       get_buzz_words("en") do |buzz_words|
         buzz_words ||= []
-        query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || buzz_words[0] || ""
+        query = params[:q] || buzz_words.grep(/^\#\S+$/)[0] || ""
         content_type("text/html", :charset => "utf-8")
         body(search(query, :search, true))
         LOGGER.info("[web] GET /")
@@ -179,7 +179,8 @@ class TSSWebServer < Sinatra::Base
 
     def search(query, template, index)
       
-      @query = query.force_encoding(Encoding::UTF_8)
+      @query = query
+      @query.force_encoding(Encoding::UTF_8) if @query.respond_to?(:force_encoding)
       @index = index
       web_socket_url = "ws://%s:%d/" %
         [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]
