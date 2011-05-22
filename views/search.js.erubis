@@ -1,6 +1,6 @@
 if (!window.console) console = {log: function(){ }, error: function(){ }};
 
-google.load("jquery", "1.4.2");
+google.load("jquery", "1.5.1");
 google.load("jqueryui", "1.8.4");
 
 WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf";
@@ -272,7 +272,7 @@ function showEntryInQueue() {
   if (entry.retweeted_status) {
     var retweetedEntry = null;
     for (var i = 0; i < entries.length; ++i) {
-      if (entries[i].id == entry.retweeted_status.id) {
+      if (entries[i].id_str == entry.retweeted_status.id_str) {
         retweetedEntry = entries[i];
         break;
       }
@@ -360,7 +360,7 @@ function raiseEntry(targetEntry) {
 }
 
 function createView(entry) {
-  var url = "http://twitter.com/" + entry.user.screen_name + "/status/" + entry.id;
+  var url = "http://twitter.com/" + entry.user.screen_name + "/status/" + entry.id_str;
   var userUrl = "http://twitter.com/" + entry.user.screen_name;
   struct =
     ["div", {className: "status", key: "statusDiv"},
