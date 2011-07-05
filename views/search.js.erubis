@@ -1,3 +1,6 @@
+// Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+// License: New BSD License
+
 if (!window.console) console = {log: function(){ }, error: function(){ }};
 
 google.load("jquery", "1.5.1");

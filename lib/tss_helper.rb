@@ -1,3 +1,8 @@
+# coding: utf-8
+
+# Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
+# License: New BSD License
+
 module TSSHelper
     
     LOGGER = Logger.new(STDERR)
