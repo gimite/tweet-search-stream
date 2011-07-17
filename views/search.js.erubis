@@ -6,7 +6,7 @@ if (!window.console) console = {log: function(){ }, error: function(){ }};
 google.load("jquery", "1.5.1");
 google.load("jqueryui", "1.8.4");
 
-WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf";
+WEB_SOCKET_SWF_LOCATION = "/js/WebSocketMain.swf?version=2";
 // WEB_SOCKET_DEBUG = true;
 FRAME_MSEC = 40;
 ANIMATION_MAX_DELAY_MSEC = 1000;
