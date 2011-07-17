@@ -438,26 +438,26 @@ function focusOnUpdateField() {
 // So I use my hand-made pattern matching.
 function autoLink(str, elem) {
   var exp =
-      /(^|\s|[^\u0020-\u007f])((\#[a-zA-Z\d_]+)|(@[a-zA-Z\d_]+)|(https?:\/\/[\u0021-\u007f]+))/g;
+      /(^|\s|[^\u0020-\u007f])(https?:\/\/[\u0021-\u007f]+)|((\#[^\x00-\x2f\x3a-\x40\x5b-\x5e\x60\x7b-\x7f]+)|(@[a-zA-Z\d_]+))/g;
   var lastIndex = 0;
   var m;
   while (m = exp.exec(str)) {
     var text = str.substr(lastIndex, m.index - lastIndex);
     //console.log(text);
     appendText(elem, text);
-    var prefix = m[1];
+    var prefix = m[1] || "";
     var url;
     var target;
-    if (m[3]) {
-      text = m[3];
+    if (m[4]) {  // Hash tag
+      text = m[4];
       url = "/search?q=" + encodeURIComponent(text) + "&hl=" + lang;
       target = "_self";
-    } else if (m[4]) {
-      text = m[4];
+    } else if (m[5]) {  // User name
+      text = m[5];
       url = "http://twitter.com/" + text.replace(/^@/, "");
       target = "_blank";
-    } else if (m[5]) {
-      text = m[5];
+    } else if (m[2]) {  // URL
+      text = m[2];
       url = text;
       target = "_blank";
     }

@@ -19,6 +19,7 @@ require "oauth"
 require "oauth/client/em_http"
 require "em-websocket"
 require "em-http"
+require "moji"
 # Tried this but it didn't work with OAuth (Twitter returns 401) for unknown reason...
 # require "twitter/json_stream"
 
@@ -80,7 +81,7 @@ class TSSEMWebSocketServer
           ws.close_with_error("bad request")
           return
         end
-        query = params["q"][0].downcase
+        query = normalize_query(params["q"][0])
         search(query) do |json|
           
           res = json && JSON.load(json)
@@ -93,9 +94,15 @@ class TSSEMWebSocketServer
           entries = res["results"].reverse()
           convert_entries(entries)
           send(ws, {"entries" => entries})
-          
-          if !(query =~ /\A\#[a-z0-9_]+\z/)
-            send(ws, {"error" => "Auto update works only for hash tags."})
+          if !(query =~ /\A\#[^ ,]+\z/)
+            error = "Auto update works only for hash tags."
+          elsif query.length > 60
+            error = "Auto update doesn't work because the query is too long."
+          else
+            error = nil
+          end
+          if error
+            send(ws, {"error" => error})
             ws.close_connection_after_writing()
             next
           end
@@ -169,15 +176,21 @@ class TSSEMWebSocketServer
         @stream_state = :idle
         return
       end
-      query = @query_to_wsocks.keys.join(",")
+      
+      queries = @query_to_wsocks.keys
+      api_query = queries.join(",")
+      escaped_queries = {}
+      for query in queries
+        escaped_queries[query] = escape_for_json(query)
+      end
       
       http = nil
-      start_search_stream(query, {
+      start_search_stream(api_query, {
         :on_init => proc() do |h|
           # It seems it's possible that on_close is called immediately before start_search_stream()
           # returns, so I need to assign to http here.
           @stream_http = http = h
-          LOGGER.info("[stream %d] Connecting: query=%p" % [http.object_id, query])
+          LOGGER.info("[stream %d] Connecting: api_query=%p" % [http.object_id, api_query])
           @stream_state = :connected
         end,
         :on_connect => proc() do
@@ -195,9 +208,9 @@ class TSSEMWebSocketServer
           text = json.scan(/"text":"(([^"\\]|\\.)*)"/).map(){ |a, b| a }.join(" ").downcase
           json.slice!(json.length - 1, 1)  # Deletes last '}'
           data = '{"entries": [%s,"now":%f}]}' % [json, Time.now.to_f()]
-          for query, wsocks in @query_to_wsocks
-            if text.index(query)
-              for wsock in wsocks
+          for query in queries
+            if text.index(escaped_queries[query]) && @query_to_wsocks[query]
+              for wsock in @query_to_wsocks[query]
                 wsock.send(data)
               end
             end
@@ -329,6 +342,16 @@ class TSSEMWebSocketServer
     def send(ws, data)
       #print_data(data)
       ws.send(JSON.dump(data))
+    end
+    
+    def escape_for_json(str)
+      return str.gsub(/[^\x20-\x7e]+/) do
+        $&.unpack("U*").map(){ |i| "\\u%04x" % i }.join("")
+      end
+    end
+    
+    def normalize_query(query)
+      return Moji.normalize_zen_han(query).downcase
     end
     
     def print_data(data)
