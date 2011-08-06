@@ -24,7 +24,6 @@
   <script type="text/javascript" src="http://www.google.com/jsapi"></script>
   <script type="text/javascript" src="http://gimite.net/js/jquery_create_element_tree.js"></script>
   <script type="text/javascript" src="/js/swfobject.js"></script>
-  <script type="text/javascript" src="/js/FABridge.js"></script>
   <script type="text/javascript" src="/js/web_socket.js"></script>
   <script type="text/javascript">
     var vars = <%= @js_vars_json %>;
