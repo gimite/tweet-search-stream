@@ -75,7 +75,7 @@ class TSSEMWebSocketServer
       never_die() do
         
         LOGGER.info("[websock %d] Connected" % ws.object_id)
-        uri = URI.parse(ws.request["Path"])
+        uri = URI.parse(ws.request["path"])
         params = CGI.parse(uri.query)
         if uri.path != "/" || params["q"].empty?
           ws.close_with_error("bad request")
@@ -341,7 +341,8 @@ class TSSEMWebSocketServer
     
     def send(ws, data)
       #print_data(data)
-      ws.send(JSON.dump(data))
+      # Passing String with UTF-8 encoding causes error.
+      ws.send(JSON.dump(data).force_encoding(Encoding::ASCII_8BIT))
     end
     
     def escape_for_json(str)
