@@ -31,6 +31,7 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
     retweetedBy: "%sがRetweet",
     DISCONNECTED: "接続が切れました。",
     POST_ERROR: "Tweetを投稿できませんでした。",
+    SEARCH_ERROR: "検索に失敗しました。",
     TOO_MANY_TERMS: "ハッシュタグが5個以上指定されているため、検索結果は自動更新されません。",
     QUERY_TOO_LONG: "検索キーワードが長すぎるため、検索結果は自動更新されません。",
     QUERY_NOT_HASH_TAGS: "ハッシュタグ以外の検索結果は自動更新されません。",
@@ -57,6 +58,7 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
     retweetedBy: "Retweeted by %s",
     DISCONNECTED: "Disconnected.",
     POST_ERROR: "Error posting your tweet.",
+    SEARCH_ERROR: "Search failed.",
     TOO_MANY_TERMS: "Auto update doesn't work because the query has more than 4 hash tags.",
     QUERY_TOO_LONG: "Auto update doesn't work because the query is too long.",
     QUERY_NOT_HASH_TAGS: "Auto update works only for hash tags.",
@@ -554,6 +556,8 @@ function showError(message, show_retry_link, details) {
       ["a",
         {href: "/search?q=" + encodeURIComponent(details.suggested_query) + "&hl=" + lang},
         details.suggested_query]];
+  } else if (message == "SEARCH_ERROR") {
+    struct = MESSAGES.SEARCH_ERROR + " (" + details.error_detail + ")";
   } else {
     struct = MESSAGES[message] || message;
   }

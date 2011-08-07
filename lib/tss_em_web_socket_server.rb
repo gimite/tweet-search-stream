@@ -86,8 +86,8 @@ class TSSEMWebSocketServer
           
           res = json && JSON.load(json)
           if !res || !res["results"]
-            message = (res && res["error"]) ? res["error"] : "Search API failed."
-            send(ws, {"error" => message})
+            detail = (res && res["error"]) ? res["error"] : "Search API failed."
+            send(ws, {"error" => "SEARCH_ERROR", "error_detail" => detail})
             ws.close_connection_after_writing()
             next
           end
