@@ -94,8 +94,12 @@ class TSSEMWebSocketServer
           entries = res["results"].reverse()
           convert_entries(entries)
           send(ws, {"entries" => entries})
+          
+          suggested_query = nil
           if query_terms.any?(){ |s| !(s =~ /\A\#[^ ,]+\z/) }
-            error = "Auto update works only for hash tags."
+            error = "QUERY_NOT_HASH_TAGS"
+            related_tags = extract_hash_tags(entries)
+            suggested_query = related_tags.empty? ? nil : related_tags.join(" OR ")
           elsif query_terms.size > 4
             error = "Auto update doesn't work because the query has more than 4 hash tags."
           elsif query_terms.join(",").length > 60
@@ -104,10 +108,11 @@ class TSSEMWebSocketServer
             error = nil
           end
           if error
-            send(ws, {"error" => error})
+            send(ws, {"error" => error, "suggested_query" => suggested_query})
             ws.close_connection_after_writing()
             next
           end
+          
           if @stream_state == :connected && query_terms.all?(){ |s| @query_to_wsocks.has_key?(s) }
             # This should be after the check in if-statement above.
             register_web_socket(query_terms, ws)
@@ -366,6 +371,17 @@ class TSSEMWebSocketServer
     def parse_query(query)
       query = Moji.normalize_zen_han(query).strip()
       return query.split(/\s+OR\s+/).map(){ |s| s.downcase }
+    end
+    
+    def extract_hash_tags(entries)
+      tag_freqs = Hash.new(0)
+      for entry in entries
+        text = Moji.normalize_zen_han(CGI.unescapeHTML(entry["text"])).downcase
+        for tag in text.scan(/\#[^\x00-\x2f\x3a-\x40\x5b-\x5e\x60\x7b-\x7f]+/).uniq()
+          tag_freqs[tag] += 1
+        end
+      end
+      return tag_freqs.sort_by(){ |t, f| -f }[0, 4].map(){ |t, f| t }
     end
     
     def print_data(data)

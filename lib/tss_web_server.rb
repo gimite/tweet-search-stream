@@ -179,8 +179,9 @@ class TSSWebServer < Sinatra::Base
 
     def search(query, template, index)
       
+      query.force_encoding(Encoding::UTF_8) if query.respond_to?(:force_encoding)
       @query = query
-      @query.force_encoding(Encoding::UTF_8) if @query.respond_to?(:force_encoding)
+      @query_field_value = index ? "" : query
       @index = index
       web_socket_url = "ws://%s:%d/" %
         [URI.parse(TSSConfig::BASE_URL).host, TSSConfig::WEB_SOCKET_SERVER_PORT]

@@ -84,7 +84,8 @@
         </p>
       <% end %>
       <div>
-        <input type="text" id="query-field" name="q" value="<%=h @query %>" size="15">
+        <input type="text" id="query-field" name="q" value="<%=h @query_field_value %>" size="30"
+          placeholder="<%=h(@lang == "ja" ? "#ハッシュタグ or キーワード" : "#hashtag or keyword")%>">
         <input type="hidden" name="hl" value="<%=h @lang %>">
         <input type="submit" value="<%=h(@lang == "ja" ? "検索" : "Search")%>">
       </div>

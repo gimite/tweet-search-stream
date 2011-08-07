@@ -19,7 +19,6 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
       "Flash Player 10以上が必要です。最新のFlash Playerをインストールしてください。",
     disconnected: "接続が切れました。",
     postError: "Tweetを投稿できませんでした。",
-    error: "エラー",
     noTweets: "Tweetが見つかりませんでした。",
     aSecondAgo: "1秒前",
     secondsAgo: "%d秒前",
@@ -31,7 +30,11 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
     hoursAgo: "%d時間前",
     beforeSource: " ",
     afterSource: "から",
-    retweetedBy: "%sがRetweet"
+    retweetedBy: "%sがRetweet",
+    QUERY_NOT_HASH_TAGS: "ハッシュタグ以外の検索結果は自動更新されません。",
+    QUERY_NOT_HASH_TAGS_WITH_SUGGEST:
+      "ハッシュタグ以外の検索結果は自動更新されません。" +
+      "以下の関連ハッシュタグをお試しください: "
   };
 <% else %>
   var MESSAGES = {
@@ -40,7 +43,6 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
       "Flash Player 10 or later is required. Install the latest Flash Player.",
     disconnected: "Disconnected.",
     postError: "Error posting your tweet.",
-    error: "Error",
     noTweets: "No tweets found.",
     aSecondAgo: "1 second ago",
     secondsAgo: "%d seconds ago",
@@ -52,7 +54,10 @@ PING_INTERVAL_MSEC = 5 * 60 * 1000;
     hoursAgo: "%d hours ago",
     beforeSource: " from ",
     afterSource: "",
-    retweetedBy: "Retweeted by %s"
+    retweetedBy: "Retweeted by %s",
+    QUERY_NOT_HASH_TAGS: "Auto update works only for hash tags.",
+    QUERY_NOT_HASH_TAGS_WITH_SUGGEST:
+      "Auto update works only for hash tags. Try related hash tags: "
   };
 <% end %>
 
@@ -180,7 +185,7 @@ function onWebSocketMessage(e) {
       onEntriesCallbacks[i](result.entries, history);
     }
   } else {
-    showError(MESSAGES.error + ": " + result.error);
+    showError(result.error, false, result);
     streamErrorReported = true;
   }
 }
@@ -536,9 +541,20 @@ function showBuzz() {
   });
 }
 
-function showError(message, show_retry_link) {
-  console.error(message);
-  $("#error-message").text(message);
+function showError(message, show_retry_link, details) {
+  console.error(message, details);
+  var struct;
+  if (message == "QUERY_NOT_HASH_TAGS" && details.suggested_query) {
+    struct = ["span",
+      MESSAGES.QUERY_NOT_HASH_TAGS_WITH_SUGGEST,
+      ["a",
+        {href: "/search?q=" + encodeURIComponent(details.suggested_query) + "&hl=" + lang},
+        details.suggested_query]];
+  } else {
+    struct = MESSAGES[message] || message;
+  }
+  $("#error-message").empty();
+  $("#error-message").append(createElementTree(struct));
   if (show_retry_link) {
     $("#retry-link").show();
   } else {
