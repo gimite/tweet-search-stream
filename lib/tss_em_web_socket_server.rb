@@ -101,9 +101,9 @@ class TSSEMWebSocketServer
             related_tags = extract_hash_tags(entries)
             suggested_query = related_tags.empty? ? nil : related_tags.join(" OR ")
           elsif query_terms.size > 4
-            error = "Auto update doesn't work because the query has more than 4 hash tags."
+            error = "TOO_MANY_TERMS"
           elsif query_terms.join(",").length > 60
-            error = "Auto update doesn't work because the query is too long."
+            error = "QUERY_TOO_LONG"
           else
             error = nil
           end
