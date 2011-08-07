@@ -81,8 +81,8 @@ class TSSEMWebSocketServer
           ws.close_with_error("bad request")
           return
         end
-        query = normalize_query(params["q"][0])
-        search(query) do |json|
+        query_terms = parse_query(params["q"][0])
+        search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)
           if !res || !res["results"]
@@ -94,9 +94,11 @@ class TSSEMWebSocketServer
           entries = res["results"].reverse()
           convert_entries(entries)
           send(ws, {"entries" => entries})
-          if !(query =~ /\A\#[^ ,]+\z/)
+          if query_terms.any?(){ |s| !(s =~ /\A\#[^ ,]+\z/) }
             error = "Auto update works only for hash tags."
-          elsif query.length > 60
+          elsif query_terms.size > 4
+            error = "Auto update doesn't work because the query has more than 4 hash tags."
+          elsif query_terms.join(",").length > 60
             error = "Auto update doesn't work because the query is too long."
           else
             error = nil
@@ -106,11 +108,12 @@ class TSSEMWebSocketServer
             ws.close_connection_after_writing()
             next
           end
-          if @stream_state == :connected && @query_to_wsocks.has_key?(query)
-            register_web_socket(query, ws)
+          if @stream_state == :connected && query_terms.all?(){ |s| @query_to_wsocks.has_key?(s) }
+            # This should be after the check in if-statement above.
+            register_web_socket(query_terms, ws)
             dump_connections()
           else
-            register_web_socket(query, ws)
+            register_web_socket(query_terms, ws)
             reconnect_to_stream()
           end
           
@@ -208,12 +211,18 @@ class TSSEMWebSocketServer
           text = json.scan(/"text":"(([^"\\]|\\.)*)"/).map(){ |a, b| a }.join(" ").downcase
           json.slice!(json.length - 1, 1)  # Deletes last '}'
           data = '{"entries": [%s,"now":%f}]}' % [json, Time.now.to_f()]
+          wsocks = Set.new()
           for query in queries
             if text.index(escaped_queries[query]) && @query_to_wsocks[query]
-              for wsock in @query_to_wsocks[query]
-                wsock.send(data)
-              end
+              wsocks.merge(@query_to_wsocks[query])
             end
+          end
+          # Passing String with UTF-8 encoding causes error.
+          # This is fixed in repository, so this force_encoding must be removed when I update
+          # em-websocket to >0.3.1.
+          data.force_encoding(Encoding::ASCII_8BIT)
+          for wsock in wsocks
+            wsock.send(data)
           end
         end,
         :on_close => proc() do
@@ -240,9 +249,11 @@ class TSSEMWebSocketServer
       @stream_state = :will_reconnect
     end
     
-    def register_web_socket(query, ws)
-      @query_to_wsocks[query] ||= []
-      @query_to_wsocks[query].push(ws)
+    def register_web_socket(query_terms, ws)
+      for term in query_terms
+        @query_to_wsocks[term] ||= []
+        @query_to_wsocks[term].push(ws)
+      end
       @wsock_to_last_access[ws] = Time.now
     end
     
@@ -251,7 +262,6 @@ class TSSEMWebSocketServer
       for query, wsocks in @query_to_wsocks
         if wsocks.delete(ws)
           found = true
-          break
         end
       end
       LOGGER.info("[websock %d] Unregistered socket not found" % ws.object_id) if !found
@@ -353,8 +363,9 @@ class TSSEMWebSocketServer
       end
     end
     
-    def normalize_query(query)
-      return Moji.normalize_zen_han(query).downcase
+    def parse_query(query)
+      query = Moji.normalize_zen_han(query).strip()
+      return query.split(/\s+OR\s+/).map(){ |s| s.downcase }
     end
     
     def print_data(data)
