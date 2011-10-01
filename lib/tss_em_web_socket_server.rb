@@ -276,7 +276,7 @@ class TSSEMWebSocketServer
     
     def start_search_stream(query, params)
       http = oauth_post_request(
-        "http://stream.twitter.com/1/statuses/filter.json",
+        "https://stream.twitter.com/1/statuses/filter.json",
         {"track" => query},
         {:timeout => 0})  # Disables timeout.
       params[:on_init].call(http)
