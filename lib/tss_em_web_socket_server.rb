@@ -222,10 +222,6 @@ class TSSEMWebSocketServer
               wsocks.merge(@query_to_wsocks[query])
             end
           end
-          # Passing String with UTF-8 encoding causes error.
-          # This is fixed in repository, so this force_encoding must be removed when I update
-          # em-websocket to >0.3.1.
-          data.force_encoding(Encoding::ASCII_8BIT)
           for wsock in wsocks
             wsock.send(data)
           end
@@ -356,10 +352,7 @@ class TSSEMWebSocketServer
     
     def send(ws, data)
       #print_data(data)
-      # Passing String with UTF-8 encoding causes error.
-      # This is fixed in repository, so this force_encoding must be removed when I update
-      # em-websocket to >0.3.1.
-      ws.send(JSON.dump(data).force_encoding(Encoding::ASCII_8BIT))
+      ws.send(JSON.dump(data))
     end
     
     def escape_for_json(str)
