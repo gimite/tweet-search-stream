@@ -77,9 +77,11 @@
           <% if @lang == "ja" %>
             Twitter Streaming APIを使ったリアルタイムTwitter検索です。
             新しいTweetが投稿されると、数秒で反映されます。
+            実験的なサービスであり、予告なく停止する場合があります。
           <% else %>
             This is real time Twitter search using Twitter Streaming API.
             New tweets are automatically shown in a few seconds after posting.
+            This is an experimental service, and may be out of service without notice.
           <% end %>
         </p>
       <% end %>
