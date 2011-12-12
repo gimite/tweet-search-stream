@@ -205,7 +205,7 @@ class TSSWebServer < Sinatra::Base
         "query" => @query,
         "lang" => @lang,
         "web_socket_url" => web_socket_url,
-      })
+      }).gsub(/\//){ "\\/" }  # Escapes / for </script>.
       return erubis(template)
       
     end
