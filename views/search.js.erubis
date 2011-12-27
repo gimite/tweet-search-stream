@@ -457,7 +457,7 @@ function focusOnUpdateField() {
 // So I use my hand-made pattern matching.
 function autoLink(str, elem) {
   var exp =
-      /(^|\s|[^\u0020-\u007f])(https?:\/\/[\u0021-\u007f]+)|((\#[^\x00-\x2f\x3a-\x40\x5b-\x5e\x60\x7b-\x7f]+)|(@[a-zA-Z\d_]+))/g;
+      /(^|\s|[^\u0020-\u007f])(https?:\/\/[\x21-\x27\x2a-\x7f]+)|((\#[^\x00-\x2f\x3a-\x40\x5b-\x5e\x60\x7b-\x7f]+)|(@[a-zA-Z\d_]+))/g;
   var lastIndex = 0;
   var m;
   while (m = exp.exec(str)) {
