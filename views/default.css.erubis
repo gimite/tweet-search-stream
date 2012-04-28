@@ -123,7 +123,7 @@ img {
 
 .result-container {
   margin-left: 170px;
-  <% if @webkit %>
+  <% if @buggy_webkit %>
     /* I'm not sure what's happening but this makes actual margin 0px in Chrome, probably
        because of existence of left-column. */
     margin-right: -150px;

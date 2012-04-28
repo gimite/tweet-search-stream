@@ -147,7 +147,7 @@ class TSSWebServer < Sinatra::Base
     end
     
     get("/css/default.css") do
-      @webkit = request.user_agent =~ /AppleWebKit/
+      @buggy_webkit = self.buggy_webkit?
       content_type("text/css")
       erubis(:"default.css")
     end
@@ -237,6 +237,17 @@ class TSSWebServer < Sinatra::Base
         request.params.merge(params).
           map(){ |k, v| CGI.escape(k) + "=" + CGI.escape(v || "") }.join("&"),
       ]
+    end
+    
+    # WebKit has a rendering bug and needs workaround.
+    # It was fixed in Chrome 19. Safari still has the bug as of April 2012.
+    def buggy_webkit?
+      if request.user_agent =~ /AppleWebKit/
+        chrome_version = request.user_agent.slice(/Chrome\/(\d+)\./, 1)
+        return !chrome_version || chrome_version.to_i() <= 18
+      else
+        return false
+      end
     end
     
 end
