@@ -85,13 +85,14 @@ class TSSEMWebSocketServer
         search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)
-          if !res || !res["results"]
-            detail = (res && res["error"]) ? res["error"] : "Search API failed."
+          if !res || !res["statuses"]
+            LOGGER.error("[websock %d] Search failed: %s" % [ws.object_id, json])
+            detail = "Search API failed."
             send(ws, {"error" => "SEARCH_ERROR", "error_detail" => detail})
             ws.close_connection_after_writing()
             next
           end
-          entries = res["results"].reverse()
+          entries = res["statuses"].reverse()
           convert_entries(entries)
           send(ws, {"entries" => entries})
           
@@ -272,7 +273,7 @@ class TSSEMWebSocketServer
     
     def start_search_stream(query, params)
       http = oauth_post_request(
-        "https://stream.twitter.com/1/statuses/filter.json",
+        "https://stream.twitter.com/1.1/statuses/filter.json",
         {"track" => query},
         {:timeout => 0})  # Disables timeout.
       params[:on_init].call(http)
@@ -305,9 +306,9 @@ class TSSEMWebSocketServer
     def search(query, &block)
       # Authentication is optional for this method, but I do it here to let per-user
       # limit (instead of per-IP limit) applied to it.
-      http = oauth_post_request(
-        "http://search.twitter.com/search.json",
-        {"q" => query, "rpp" => 50, "result_type" => "recent"},
+      http = oauth_get_request(
+        "https://api.twitter.com/1.1/search/tweets.json",
+        {"q" => query, "count" => 50, "result_type" => "recent"},
         :timeout => 30)
       LOGGER.info("[search %d] Fetching: query=%p" % [http.object_id, query])
       http.callback() do
@@ -325,6 +326,16 @@ class TSSEMWebSocketServer
       end
     end
     
+    def oauth_get_request(url, params, options = {})
+      request = EventMachine::HttpRequest.new(url)
+      base_options = {
+        :query => params,
+      }
+      return request.get(base_options.merge(options)) do |client|
+        @oauth_consumer.sign!(client, @oauth_access_token)
+      end
+    end
+    
     def oauth_post_request(url, params, options = {})
       request = EventMachine::HttpRequest.new(url)
       base_options = {
@@ -336,13 +347,9 @@ class TSSEMWebSocketServer
       end
     end
     
-    # Converts entry in Search API to entry in Search Streaming API.
+    # Adds "now" field.
     def convert_entries(entries)
       for entry in entries
-        entry["user"] = {
-          "screen_name" => entry["from_user"],
-          "profile_image_url" => entry["profile_image_url"],
-        }
         entry["now"] = Time.now.to_f()
         if entry["retweeted_status"]
           convert_entries([entry["retweeted_status"]])
