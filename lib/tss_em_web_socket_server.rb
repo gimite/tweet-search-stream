@@ -54,7 +54,7 @@ class TSSEMWebSocketServer
       @stream_http = nil
       @stream_state = :idle
       @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
-      @recent_reconnections = [Time.at(0)] * 3
+      @recent_reconnections = [Time.at(0)] * 1
     end
     
     def schedule()
@@ -166,7 +166,7 @@ class TSSEMWebSocketServer
         return
       end
       
-      # If this is 4th reconnection in 60 sec, wait for 60 sec,
+      # If this is 2nd reconnection in 60 sec, wait for 60 sec,
       # to avoid Twitter API error.
       if @recent_reconnections[0] >= Time.now - 60
         reconnect_later(60)
@@ -175,8 +175,8 @@ class TSSEMWebSocketServer
       @recent_reconnections.push(Time.now)
       @recent_reconnections.shift()
       
-      if @stream_state == :connected
-        @stream_http.close_connection()
+      if @stream_http
+        @stream_http.close_connection() rescue nil
         @stream_http = nil
       end
       @query_to_wsocks.delete_if(){ |q, wss| wss.empty? }
