@@ -29,9 +29,6 @@ require "tss_config"
 require "tss_helper"
 
 
-Sinatra::Request.send(:include, HttpAcceptLanguage)
-
-
 class TSSWebServer < Sinatra::Base
     
     include(TSSHelper)
@@ -41,7 +38,8 @@ class TSSWebServer < Sinatra::Base
     
     set(:port, TSSConfig::WEB_SERVER_PORT)
     set(:environment, TSSConfig::SINATRA_ENVIRONMENT)
-    set(:public, "./public")
+    set(:public_dir, "./public")
+    set(:views, "./views")
     set(:logging, true)
     use(Rack::Session::Cookie, {
       :key => TSSConfig::SESSION_COOKIE_KEY,
@@ -50,6 +48,7 @@ class TSSWebServer < Sinatra::Base
       # Reuses Twitter key. Anything secret is fine.
       :secret => TSSConfig::TWITTER_API_WRITE_SECRET,
     })
+    use(HttpAcceptLanguage::Middleware)
     register(Sinatra::Async)
     configure(:development) do
       register(Sinatra::Reloader)
@@ -59,7 +58,7 @@ class TSSWebServer < Sinatra::Base
       @twitter = get_twitter(session[:access_token], session[:access_token_secret])
       @lang = params[:hl]
       if !@lang && ["/", "/search", "/js/search.js"].include?(request.path)
-        @lang = request.compatible_language_from(["en", "ja"]) || "en"
+        @lang = request.env.http_accept_language.compatible_language_from(["en", "ja"]) || "en"
         redirect(TSSConfig::BASE_URL + to_url(request, {"hl" => @lang}))
       end
     end
@@ -106,7 +105,7 @@ class TSSWebServer < Sinatra::Base
           :oauth_token => params[:oauth_token],
           :oauth_verifier => params[:oauth_verifier])
       rescue OAuth::Unauthorized => @exception
-        return erubis(%{ Authentication failed: <%=h @exception.message %> })
+        return erb(%{ Authentication failed: <%=h @exception.message %> })
       end
       @twitter = get_twitter(@access_token.token, @access_token.secret)
       session[:access_token] = @access_token.token
@@ -149,12 +148,12 @@ class TSSWebServer < Sinatra::Base
     get("/css/default.css") do
       @buggy_webkit = self.buggy_webkit?
       content_type("text/css")
-      erubis(:"default.css")
+      erb(:"default.css")
     end
 
     get("/js/search.js") do
       content_type("text/javascript")
-      erubis(:"search.js")
+      erb(:"search.js")
     end
 
     def get_twitter(access_token, access_token_secret)
@@ -206,7 +205,7 @@ class TSSWebServer < Sinatra::Base
         "lang" => @lang,
         "web_socket_url" => web_socket_url,
       }).gsub(/\//){ "\\/" }  # Escapes / for </script>.
-      return erubis(template)
+      return erb(template)
       
     end
     

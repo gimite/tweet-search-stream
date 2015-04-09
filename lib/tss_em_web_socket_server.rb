@@ -19,6 +19,7 @@ require "oauth"
 require "oauth/client/em_http"
 require "em-websocket"
 require "em-http"
+require "em-http/middleware/oauth"
 require "moji"
 # Tried this but it didn't work with OAuth (Twitter returns 401) for unknown reason...
 # require "twitter/json_stream"
@@ -41,14 +42,12 @@ class TSSEMWebSocketServer
     end
     
     def initialize()
-      @oauth_consumer = OAuth::Consumer.new(
-        TSSConfig::TWITTER_API_KEY,
-        TSSConfig::TWITTER_API_SECRET,
-        :site => "http://twitter.com")
-      @oauth_access_token = OAuth::AccessToken.new(
-        @oauth_consumer,
-        TSSConfig::TWITTER_API_ACCESS_TOKEN,
-        TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET)
+      @oauth_config = {
+        :consumer_key     => TSSConfig::TWITTER_API_KEY,
+        :consumer_secret  => TSSConfig::TWITTER_API_SECRET,
+        :access_token     => TSSConfig::TWITTER_API_ACCESS_TOKEN,
+        :access_token_secret => TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET,
+      }
       @query_to_wsocks = {}
       @wsock_to_last_access = {}
       @stream_http = nil
@@ -61,7 +60,7 @@ class TSSEMWebSocketServer
       EventMachine.schedule() do
         port = TSSConfig::WEB_SOCKET_SERVER_PORT
         EventMachine::WebSocket.start(:host => "0.0.0.0", :port => port) do |ws|
-          ws.onopen(){ on_web_socket_open(ws) }
+          ws.onopen(){ |hs| on_web_socket_open(ws, hs) }
           ws.onclose(){ on_web_socket_close(ws) }
           ws.onmessage(){ |m| on_web_socket_message(ws, m) }
           ws.onerror(){ |r| on_web_socket_error(ws, r) }
@@ -71,17 +70,15 @@ class TSSEMWebSocketServer
       end
     end
     
-    def on_web_socket_open(ws)
+    def on_web_socket_open(ws, handshake)
       never_die() do
         
         LOGGER.info("[websock %d] Connected" % ws.object_id)
-        uri = URI.parse(ws.request["path"])
-        params = CGI.parse(uri.query)
-        if uri.path != "/" || params["q"].empty?
+        if handshake.path != "/" || !handshake.query["q"] || handshake.query["q"].empty?
           ws.close_with_error("bad request")
           return
         end
-        query_terms = parse_query(params["q"][0])
+        query_terms = parse_query(URI.decode(handshake.query["q"]))
         search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)
@@ -315,6 +312,9 @@ class TSSEMWebSocketServer
         never_die() do
           LOGGER.info(
             "[search %d] Fetched: status=%p" % [http.object_id, http.response_header.status])
+          if http.response_header.status != 200
+            LOGGER.info("[search %d] body=%p" % [http.object_id, http.response])
+          end
           yield(http.response_header.status == 200 ? http.response : nil)
         end
       end
@@ -331,9 +331,8 @@ class TSSEMWebSocketServer
       base_options = {
         :query => params,
       }
-      return request.get(base_options.merge(options)) do |client|
-        @oauth_consumer.sign!(client, @oauth_access_token)
-      end
+      request.use(EventMachine::Middleware::OAuth, @oauth_config)
+      return request.get(base_options.merge(options))
     end
     
     def oauth_post_request(url, params, options = {})
@@ -342,9 +341,8 @@ class TSSEMWebSocketServer
         :body => params,
         :head => {"Content-Type" => "application/x-www-form-urlencoded"},
       }
-      return request.post(base_options.merge(options)) do |client|
-        @oauth_consumer.sign!(client, @oauth_access_token)
-      end
+      request.use(EventMachine::Middleware::OAuth, @oauth_config)
+      return request.post(base_options.merge(options))
     end
     
     # Adds "now" field.
