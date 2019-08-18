@@ -143,22 +143,6 @@
     
     <div class="container">
       
-      <div id="left-column" class="left-column">
-        <div class="buzz-nav"><img id="close-left-button" src="/images/cross.png" title="Hide hot words"></div>
-        <div class="buzz-title">
-          <% if @lang == "ja" %>
-            話題のハッシュタグ
-          <% else %>
-            Hot hash tags
-          <% end %>
-        </div>
-        <div id="buzz" class="buzz">Loading...</div>
-        <div class="buzz-footer">
-          <div>Powered by <a href="http://buzztter.com/" target="_blank">buzztter</a></div>
-          <div>Icon by <a href="http://www.famfamfam.com/" target="_blank">famfamfam.com</a></div>
-        </div>
-      </div>
-      
       <% if !@query.empty? %>
         
         <div id="error-bar" class="error center-column" style="display: none;">
