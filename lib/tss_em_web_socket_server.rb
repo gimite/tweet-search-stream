@@ -19,6 +19,7 @@ require "oauth"
 require "oauth/client/em_http"
 require "em-websocket"
 require "em-http"
+require "em-http/middleware/oauth"
 require "moji"
 # Tried this but it didn't work with OAuth (Twitter returns 401) for unknown reason...
 # require "twitter/json_stream"
@@ -35,7 +36,14 @@ class TSSEMWebSocketServer
     DEFAULT_RECONNECT_WAIT_SEC = 10
     # Must be somewhat longer than PING_INTERVAL_MSEC in view/search.erb.
     PING_TIMEOUT_SEC = 6 * 60
-    
+
+    OAUTH_CONFIG = {
+      :consumer_key => TSSConfig::TWITTER_API_KEY,
+      :consumer_secret => TSSConfig::TWITTER_API_SECRET,
+      :access_token => TSSConfig::TWITTER_API_ACCESS_TOKEN,
+      :access_token_secret => TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET,
+    }
+
     def self.schedule()
       TSSEMWebSocketServer.new().schedule()
     end
@@ -75,11 +83,14 @@ class TSSEMWebSocketServer
       never_die() do
         
         LOGGER.info("[websock %d] Connected" % ws.object_id)
-        if handshake.path != "/" || !handshake.query.has_key?("q")
+        # Prases handshake.query_string instead of using handshake.query
+        # because handshake.query does not perform URL decoding.
+        params = CGI.parse(handshake.query_string)
+        if handshake.path != "/" || params["q"].empty?
           ws.close_with_error("bad request")
           return
         end
-        query_terms = parse_query(handshake.query["q"])
+        query_terms = parse_query(params["q"][0])
         search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)
@@ -273,7 +284,7 @@ class TSSEMWebSocketServer
       http = oauth_post_request(
         "https://stream.twitter.com/1.1/statuses/filter.json",
         {"track" => query},
-        {:timeout => 0})  # Disables timeout.
+        {:connect_timeout => 30, :inactivity_timeout => 0})  # Disables inactivity timeout.
       params[:on_init].call(http)
       buffer = ""
       connected = false
@@ -307,42 +318,41 @@ class TSSEMWebSocketServer
       http = oauth_get_request(
         "https://api.twitter.com/1.1/search/tweets.json",
         {"q" => query, "count" => 50, "result_type" => "recent"},
-        :timeout => 30)
+        {:connect_timeout => 30, :inactivity_timeout => 30})
       LOGGER.info("[search %d] Fetching: query=%p" % [http.object_id, query])
       http.callback() do
         never_die() do
           LOGGER.info(
-            "[search %d] Fetched: status=%p" % [http.object_id, http.response_header.status])
+            "[search %d] Fetched: status=%p, body=%p" % [
+              http.object_id, http.response_header.status,
+              http.response_header.status == 200 ? nil : http.response
+            ])
           yield(http.response_header.status == 200 ? http.response : nil)
         end
       end
-      http.errback() do
+      http.errback() do |*args|
         never_die() do
-          LOGGER.info("[search %d] Failed" % http.object_id)
+          LOGGER.info("[search %d] Failed")
           yield(nil)
         end
       end
     end
     
     def oauth_get_request(url, params, options = {})
-      request = EventMachine::HttpRequest.new(url)
-      base_options = {
+      request = EventMachine::HttpRequest.new(url, options)
+      request.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
+      return request.get({
         :query => params,
-      }
-      return request.get(base_options.merge(options)) do |client|
-        @oauth_consumer.sign!(client, @oauth_access_token)
-      end
+      })
     end
     
     def oauth_post_request(url, params, options = {})
-      request = EventMachine::HttpRequest.new(url)
-      base_options = {
+      request = EventMachine::HttpRequest.new(url, options)
+      request.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
+      return request.post({
         :body => params,
         :head => {"Content-Type" => "application/x-www-form-urlencoded"},
-      }
-      return request.post(base_options.merge(options)) do |client|
-        @oauth_consumer.sign!(client, @oauth_access_token)
-      end
+      })
     end
     
     # Adds "now" field.
