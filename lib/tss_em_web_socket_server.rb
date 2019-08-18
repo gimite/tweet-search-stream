@@ -61,7 +61,7 @@ class TSSEMWebSocketServer
       EventMachine.schedule() do
         port = TSSConfig::WEB_SOCKET_SERVER_PORT
         EventMachine::WebSocket.start(:host => "0.0.0.0", :port => port) do |ws|
-          ws.onopen(){ on_web_socket_open(ws) }
+          ws.onopen(){ |h| on_web_socket_open(ws, h) }
           ws.onclose(){ on_web_socket_close(ws) }
           ws.onmessage(){ |m| on_web_socket_message(ws, m) }
           ws.onerror(){ |r| on_web_socket_error(ws, r) }
@@ -71,17 +71,15 @@ class TSSEMWebSocketServer
       end
     end
     
-    def on_web_socket_open(ws)
+    def on_web_socket_open(ws, handshake)
       never_die() do
         
         LOGGER.info("[websock %d] Connected" % ws.object_id)
-        uri = URI.parse(ws.request["path"])
-        params = CGI.parse(uri.query)
-        if uri.path != "/" || params["q"].empty?
+        if handshake.path != "/" || !handshake.query.has_key?("q")
           ws.close_with_error("bad request")
           return
         end
-        query_terms = parse_query(params["q"][0])
+        query_terms = parse_query(handshake.query["q"])
         search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)

@@ -11,4 +11,5 @@ gem "em-websocket"
 gem "async_sinatra"
 gem "http_accept_language"
 gem "erubis"
+gem "activesupport"  # Implicit dependency of http_accept_language
 gem "json" if RUBY_VERSION < "1.9.0"
