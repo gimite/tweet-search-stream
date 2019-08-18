@@ -106,7 +106,7 @@ class TSSWebServer < Sinatra::Base
           :oauth_token => params[:oauth_token],
           :oauth_verifier => params[:oauth_verifier])
       rescue OAuth::Unauthorized => @exception
-        return erubis(%{ Authentication failed: <%=h @exception.message %> })
+        return erb(%{ Authentication failed: <%=h @exception.message %> })
       end
       @twitter = get_twitter(@access_token.token, @access_token.secret)
       session[:access_token] = @access_token.token
@@ -149,12 +149,12 @@ class TSSWebServer < Sinatra::Base
     get("/css/default.css") do
       @buggy_webkit = self.buggy_webkit?
       content_type("text/css")
-      erubis(:"default.css")
+      erb(:"default.css")
     end
 
     get("/js/search.js") do
       content_type("text/javascript")
-      erubis(:"search.js")
+      erb(:"search.js")
     end
 
     def get_twitter(access_token, access_token_secret)
@@ -206,7 +206,7 @@ class TSSWebServer < Sinatra::Base
         "lang" => @lang,
         "web_socket_url" => web_socket_url,
       }).gsub(/\//){ "\\/" }  # Escapes / for </script>.
-      return erubis(template)
+      return erb(template)
       
     end
     

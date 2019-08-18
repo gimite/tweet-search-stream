@@ -49,14 +49,12 @@ class TSSEMWebSocketServer
     end
     
     def initialize()
-      @oauth_consumer = OAuth::Consumer.new(
-        TSSConfig::TWITTER_API_KEY,
-        TSSConfig::TWITTER_API_SECRET,
-        :site => "http://twitter.com")
-      @oauth_access_token = OAuth::AccessToken.new(
-        @oauth_consumer,
-        TSSConfig::TWITTER_API_ACCESS_TOKEN,
-        TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET)
+      @oauth_config = {
+        :consumer_key     => TSSConfig::TWITTER_API_KEY,
+        :consumer_secret  => TSSConfig::TWITTER_API_SECRET,
+        :access_token     => TSSConfig::TWITTER_API_ACCESS_TOKEN,
+        :access_token_secret => TSSConfig::TWITTER_API_ACCESS_TOKEN_SECRET,
+      }
       @query_to_wsocks = {}
       @wsock_to_last_access = {}
       @stream_http = nil
@@ -90,7 +88,7 @@ class TSSEMWebSocketServer
           ws.close_with_error("bad request")
           return
         end
-        query_terms = parse_query(params["q"][0])
+        query_terms = parse_query(URI.decode(handshake.query["q"]))
         search(query_terms.join(" OR ")) do |json|
           
           res = json && JSON.load(json)
@@ -323,10 +321,10 @@ class TSSEMWebSocketServer
       http.callback() do
         never_die() do
           LOGGER.info(
-            "[search %d] Fetched: status=%p, body=%p" % [
-              http.object_id, http.response_header.status,
-              http.response_header.status == 200 ? nil : http.response
-            ])
+            "[search %d] Fetched: status=%p" % [http.object_id, http.response_header.status])
+          if http.response_header.status != 200
+            LOGGER.info("[search %d] body=%p" % [http.object_id, http.response])
+          end
           yield(http.response_header.status == 200 ? http.response : nil)
         end
       end
