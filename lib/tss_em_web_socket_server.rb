@@ -33,7 +33,8 @@ class TSSEMWebSocketServer
     
     include(TSSHelper)
     
-    DEFAULT_RECONNECT_WAIT_SEC = 10
+    DEFAULT_RECONNECT_WAIT_SEC = 60
+    MAX_RECONNECT_WAIT_SEC = 3600
     # Must be somewhat longer than PING_INTERVAL_MSEC in view/search.erb.
     PING_TIMEOUT_SEC = 6 * 60
 
@@ -239,7 +240,7 @@ class TSSEMWebSocketServer
             LOGGER.info("[stream %d] Closed unexpectedly: status=%p body=%p" %
               [http.object_id, http.response_header.status, http.response])
             reconnect_later(@reconnect_wait_sec)
-            @reconnect_wait_sec = [@reconnect_wait_sec * 2, 240].min
+            @reconnect_wait_sec = [@reconnect_wait_sec * 2, MAX_RECONNECT_WAIT_SEC].min
           else
             # Intentionally disconnected to reconnect with a new query.
             LOGGER.info("[stream %d] Closed intentionally: status=%p body=%p" %
