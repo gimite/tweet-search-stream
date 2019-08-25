@@ -59,6 +59,7 @@ class TSSEMWebSocketServer
       @query_to_wsocks = {}
       @wsock_to_last_access = {}
       @stream_http = nil
+      @stream_connection = nil
       @stream_state = :idle
       @reconnect_wait_sec = DEFAULT_RECONNECT_WAIT_SEC
       @recent_reconnections = [Time.at(0)] * 1
@@ -184,8 +185,12 @@ class TSSEMWebSocketServer
       @recent_reconnections.shift()
       
       if @stream_http
-        @stream_http.close_connection() rescue nil
+        connection = @stream_connection
         @stream_http = nil
+        @stream_connection = nil
+        never_die do
+          connection.close()
+        end
       end
       @query_to_wsocks.delete_if(){ |q, wss| wss.empty? }
       dump_connections()
@@ -203,10 +208,11 @@ class TSSEMWebSocketServer
       
       http = nil
       start_search_stream(api_query, {
-        :on_init => proc() do |h|
+        :on_init => proc() do |h, c|
           # It seems it's possible that on_close is called immediately before start_search_stream()
           # returns, so I need to assign to http here.
           @stream_http = http = h
+          @stream_connection = c
           LOGGER.info("[stream %d] Connecting: api_query=%p" % [http.object_id, api_query])
           @stream_state = :connected
         end,
@@ -280,11 +286,11 @@ class TSSEMWebSocketServer
     end
     
     def start_search_stream(query, params)
-      http = oauth_post_request(
+      (http, connection) = oauth_post_request(
         "https://stream.twitter.com/1.1/statuses/filter.json",
         {"track" => query},
         {:connect_timeout => 30, :inactivity_timeout => 0})  # Disables inactivity timeout.
-      params[:on_init].call(http)
+      params[:on_init].call(http, connection)
       buffer = ""
       connected = false
       http.stream do |chunk|
@@ -314,7 +320,7 @@ class TSSEMWebSocketServer
     def search(query, &block)
       # Authentication is optional for this method, but I do it here to let per-user
       # limit (instead of per-IP limit) applied to it.
-      http = oauth_get_request(
+      (http, _) = oauth_get_request(
         "https://api.twitter.com/1.1/search/tweets.json",
         {"q" => query, "count" => 50, "result_type" => "recent"},
         {:connect_timeout => 30, :inactivity_timeout => 30})
@@ -338,20 +344,22 @@ class TSSEMWebSocketServer
     end
     
     def oauth_get_request(url, params, options = {})
-      request = EventMachine::HttpRequest.new(url, options)
-      request.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
-      return request.get({
+      connection = EventMachine::HttpRequest.new(url, options)
+      connection.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
+      client = connection.get({
         :query => params,
       })
+      return [client, connection]
     end
     
     def oauth_post_request(url, params, options = {})
-      request = EventMachine::HttpRequest.new(url, options)
-      request.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
-      return request.post({
+      connection = EventMachine::HttpRequest.new(url, options)
+      connection.use(EventMachine::Middleware::OAuth, OAUTH_CONFIG)
+      client = connection.post({
         :body => params,
         :head => {"Content-Type" => "application/x-www-form-urlencoded"},
       })
+      return [client, connection]
     end
     
     # Adds "now" field.
