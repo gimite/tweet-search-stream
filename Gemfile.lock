@@ -54,7 +54,7 @@ GEM
     naught (1.1.0)
     oauth (0.5.4)
     public_suffix (3.1.1)
-    rack (2.0.7)
+    rack (2.0.8)
     rack-protection (2.0.5)
       rack
     simple_oauth (0.3.1)
