@@ -1,11 +1,12 @@
 GEM
   remote: http://rubygems.org/
   specs:
-    activesupport (5.2.3)
+    activesupport (6.1.7.1)
       concurrent-ruby (~> 1.0, >= 1.0.2)
-      i18n (>= 0.7, < 2)
-      minitest (~> 5.1)
-      tzinfo (~> 1.1)
+      i18n (>= 1.6, < 2)
+      minitest (>= 5.1)
+      tzinfo (~> 2.0)
+      zeitwerk (~> 2.3)
     addressable (2.6.0)
       public_suffix (>= 2.0.2, < 4.0)
     async_sinatra (1.3.0)
@@ -13,7 +14,7 @@ GEM
       sinatra (>= 1.4.8)
     backports (3.15.0)
     buftok (0.2.0)
-    concurrent-ruby (1.1.5)
+    concurrent-ruby (1.1.10)
     cookiejar (0.3.3)
     daemons (1.3.1)
     domain_name (0.5.20190701)
@@ -42,11 +43,11 @@ GEM
     http-form_data (2.1.1)
     http_accept_language (2.1.1)
     http_parser.rb (0.6.0)
-    i18n (1.6.0)
+    i18n (1.12.0)
       concurrent-ruby (~> 1.0)
     memoizable (0.4.2)
       thread_safe (~> 0.3, >= 0.3.1)
-    minitest (5.11.3)
+    minitest (5.17.0)
     moji (1.6)
     multi_json (1.13.1)
     multipart-post (2.1.1)
@@ -89,11 +90,12 @@ GEM
       multipart-post (~> 2.0)
       naught (~> 1.0)
       simple_oauth (~> 0.3.0)
-    tzinfo (1.2.5)
-      thread_safe (~> 0.1)
+    tzinfo (2.0.5)
+      concurrent-ruby (~> 1.0)
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.7.6)
+    zeitwerk (2.6.6)
 
 PLATFORMS
   ruby
